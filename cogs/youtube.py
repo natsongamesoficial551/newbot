@@ -28,10 +28,12 @@ class YouTube(commands.Cog):
         if not match:
             return None
         username = match.group(1)
-        base_url = "https://www.googleapis.com/youtube/v3/channels"
+        base_url = "https://www.googleapis.com/youtube/v3/search"
         params = {
-            "part": "id",
-            "forUsername": username,
+            "part": "snippet",
+            "maxResults": 1,
+            "q": username,
+            "type": "channel",
             "key": self.api_key
         }
 
@@ -39,7 +41,7 @@ class YouTube(commands.Cog):
             async with session.get(base_url, params=params) as resp:
                 data = await resp.json()
                 if "items" in data and data["items"]:
-                    return data["items"][0]["id"]
+                    return data["items"][0]["snippet"]["channelId"]
                 else:
                     return None
 
@@ -48,7 +50,6 @@ class YouTube(commands.Cog):
     async def canalyt(self, ctx, url: str, canal: discord.TextChannel):
         await ctx.defer()
         canal_id = self.extrair_channel_id(url)
-
         if not canal_id:
             canal_id = await self.obter_channel_id_por_username(url)
             if not canal_id:
@@ -188,7 +189,6 @@ class YouTube(commands.Cog):
                         embed.set_author(name="Novo vídeo no YouTube 🎬")
                         embed.set_thumbnail(url="https://www.iconpacks.net/icons/2/free-youtube-logo-icon-2431-thumb.png")
                         embed.set_footer(text="NatanBot • Notificação de vídeo")
-
                         await canal.send(embed=embed)
 
                     await self.collection.update_one(
