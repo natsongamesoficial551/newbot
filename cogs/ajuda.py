@@ -96,7 +96,7 @@ class Ajuda(commands.Cog):
             "`!sacar / !withdraw`\n"
             "`!loja / !shop`\n"
             "`!comprar / !buy`\n"
-            "`!vender / !sell`\n"
+            "`!vender / !sell`\n`
             "`!crime`\n"
             "`!roubar / !rob`\n"
             "`!apostar / !bet`\n"
@@ -111,7 +111,7 @@ class Ajuda(commands.Cog):
         embed.add_field(name="🔧 Utilidades", value=(
             "`!botinfo`\n"
             "`!userinfo`\n"
-            "`!serverinfo`\n"
+            "`!serverinfo`\n`
             "`!ping`\n"
             "`!avatar`\n"
             "`!banner`\n"
@@ -130,7 +130,7 @@ class Ajuda(commands.Cog):
         embed.add_field(name="🎭 Roleplay", value=(
             "`!abracar @usuário`\n"
             "`!beijar @usuário`\n"
-            "`!bofetada @usuário`\n"
+            "`!bofetada @usuário`\n`
             "`!cafune @usuário`\n"
             "`!tocaaqui @usuário`\n"
             "`!atacar @usuário`\n"
@@ -139,12 +139,19 @@ class Ajuda(commands.Cog):
         ), inline=False)
 
         embed.add_field(name="🎮 Diversão", value=(
-            "`!evento`\n"
-            "`!ship @user1 @user2`\n"
-            "`!rolar 2 6`\n"
-            "`!jankenpon pedra`\n"
-            "`!vaporwave texto`\n"
-            "`!avaliar_waifu nome`"
+            "`!piada` - Conta piadas aleatórias\n"
+            "`!curiosidade` - Compartilha fatos interessantes\n"
+            "`!pergunta` - Faz perguntas para animar conversas\n"
+            "`!dado [lados]` - Rola dados personalizáveis\n"
+            "`!moeda` - Cara ou coroa\n"
+            "`!rps <pedra/papel/tesoura>` - Jogo clássico\n"
+            "`!escolher <opções>` - Escolhe entre opções separadas por vírgula\n"
+            "`!8ball <pergunta>` - Bola 8 mágica\n"
+            "`!love @user1 @user2` - Calculadora de compatibilidade\n"
+            "`!motivar [@usuário]` - Frases motivacionais\n"
+            "`!rank [mensagens/comandos]`\n"
+            "`!clima` - Verifica o 'humor' do servidor\n"
+            "`!gif <termo>` - Busca GIFs (com URLs de exemplo)"
         ), inline=False)
 
         embed.set_footer(text="Use os comandos com ! no início. Ex: !ping")

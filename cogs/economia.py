@@ -24,10 +24,11 @@ class Economia(commands.Cog):
         
         # Jobs e crimes
         self.jobs = {
-            "entregador": {"salary": (200, 800), "desc": "Entrega comidas"},
-            "caixa": {"salary": (300, 600), "desc": "Atende clientes"},
-            "programador": {"salary": (1000, 1500), "desc": "Desenvolve apps"},
-            "medico": {"salary": (1500, 2500), "desc": "Cuida da saúde"}
+            "entregador": {"salary": (200, 800), "desc": "Entrega comidas", "req": 0},
+            "caixa": {"salary": (300, 600), "desc": "Atende clientes", "req": 500},
+            "programador": {"salary": (1000, 1500), "desc": "Desenvolve apps", "req": 5000},
+            "medico": {"salary": (1500, 2500), "desc": "Cuida da saúde", "req": 10000},
+            "empresario": {"salary": (2000, 4000), "desc": "Gerencia negócios", "req": 50000}
         }
         
         self.crimes = {
@@ -186,6 +187,68 @@ class Economia(commands.Cog):
                 embed.add_field(name="👑 Bônus VIP", value="2x recompensa aplicada!", inline=False)
             await ctx.send(embed=embed)
 
+    @commands.command(name='empregos', aliases=['jobs'])
+    async def jobs_list(self, ctx):
+        """Lista todos os empregos disponíveis"""
+        embed = discord.Embed(title="💼 Empregos Disponíveis", color=0x0099ff)
+        for job, data in self.jobs.items():
+            min_sal, max_sal = data["salary"]
+            req_text = f"Mín: {self.format_money(data['req'])}" if data['req'] > 0 else "Sem requisitos"
+            embed.add_field(
+                name=job.title(), 
+                value=f"{data['desc']}\n💰 {self.format_money(min_sal)} - {self.format_money(max_sal)}\n📋 {req_text}", 
+                inline=True
+            )
+        embed.set_footer(text="Use !contratar <emprego> para se candidatar")
+        await ctx.send(embed=embed)
+
+    @commands.command(name='contratar', aliases=['apply'])
+    async def apply_job(self, ctx, *, job_name: str):
+        """Se candidata a um emprego"""
+        job_name = job_name.lower()
+        if job_name not in self.jobs:
+            return await ctx.send("❌ Emprego não encontrado! Use `!empregos` para ver as opções.")
+        
+        data = await self.get_user_data(ctx.author.id)
+        job_data = self.jobs[job_name]
+        total_money = data["balance"] + data["bank"]
+        
+        if data["job"] == job_name:
+            return await ctx.send(f"❌ Você já trabalha como {job_name}!")
+        
+        if total_money < job_data["req"]:
+            needed = job_data["req"] - total_money
+            return await ctx.send(f"❌ Você precisa de {self.format_money(needed)} a mais para se candidatar a este emprego!")
+        
+        # Chance de conseguir o emprego baseada nos requisitos
+        success_rate = 70 if total_money >= job_data["req"] * 2 else 50
+        
+        if random.randint(1, 100) <= success_rate:
+            success = await self.update_user_data(ctx.author.id, {"job": job_name})
+            if success:
+                embed = discord.Embed(title="🎉 Parabéns!", description=f"Você foi contratado como {job_name}!", color=0x00ff00)
+                embed.add_field(name="Salário", value=f"{self.format_money(job_data['salary'][0])} - {self.format_money(job_data['salary'][1])}", inline=False)
+                await ctx.send(embed=embed)
+        else:
+            embed = discord.Embed(title="😔 Candidatura Rejeitada", description=f"Infelizmente você não foi selecionado para {job_name}. Tente novamente!", color=0xff0000)
+            await ctx.send(embed=embed)
+
+    @commands.command(name='demitir', aliases=['quit'])
+    async def quit_job(self, ctx):
+        """Se demite do emprego atual"""
+        data = await self.get_user_data(ctx.author.id)
+        
+        if not data["job"]:
+            return await ctx.send("❌ Você não tem um emprego para se demitir!")
+        
+        old_job = data["job"]
+        success = await self.update_user_data(ctx.author.id, {"job": None})
+        
+        if success:
+            embed = discord.Embed(title="👋 Demissão", description=f"Você se demitiu do cargo de {old_job}!", color=0xff9900)
+            embed.add_field(name="Status", value="Agora você está desempregado", inline=False)
+            await ctx.send(embed=embed)
+
     @commands.command(name='trabalhar', aliases=['work'])
     async def work(self, ctx):
         data = await self.get_user_data(ctx.author.id)
@@ -193,10 +256,7 @@ class Economia(commands.Cog):
         multipliers = await self.get_vip_multipliers(ctx.author.id, ctx.guild.id)
         
         if not data["job"]:
-            job = random.choice(list(self.jobs.keys()))
-            await self.update_user_data(ctx.author.id, {"job": job})
-            data["job"] = job
-            return await ctx.send(embed=discord.Embed(title="💼 Novo Emprego", description=f"Você conseguiu trabalho como {job}!", color=0x00ff00))
+            return await ctx.send("❌ Você não tem emprego! Use `!empregos` para ver as opções e `!contratar <emprego>` para se candidatar.")
         
         if data["last_work"]:
             last = datetime.fromisoformat(data["last_work"])
@@ -396,6 +456,38 @@ class Economia(commands.Cog):
                 await ctx.send(embed=discord.Embed(title="🛒 Compra Realizada", description=f"Comprou {item_name} por {self.format_money(price)}!", color=0x00ff00))
         except:
             await ctx.send("❌ Erro na compra")
+
+    @commands.command(name='vender', aliases=['sell'])
+    async def sell_item(self, ctx, *, item_name: str):
+        """Vende um item do inventário"""
+        data = await self.get_user_data(ctx.author.id)
+        item_name = item_name.lower()
+        inv = data.get("inventory", {})
+        
+        if item_name not in inv or inv[item_name] <= 0:
+            return await ctx.send("❌ Você não possui este item!")
+        
+        try:
+            shop_item = await self.shop_collection.find_one({"item": item_name})
+            if not shop_item:
+                return await ctx.send("❌ Este item não pode ser vendido!")
+            
+            sell_price = int(shop_item["price"] * 0.6)  # Vende por 60% do preço original
+            
+            inv[item_name] -= 1
+            if inv[item_name] == 0:
+                del inv[item_name]
+            
+            success = await self.update_user_data(ctx.author.id, {
+                "balance": data["balance"] + sell_price, 
+                "inventory": inv
+            })
+            
+            if success:
+                embed = discord.Embed(title="💸 Item Vendido", description=f"Você vendeu {item_name} por {self.format_money(sell_price)}!", color=0x00ff00)
+                await ctx.send(embed=embed)
+        except:
+            await ctx.send("❌ Erro ao vender o item")
 
     @commands.command(name='vantagens', aliases=['vipinfo'])
     async def vip_benefits(self, ctx):
