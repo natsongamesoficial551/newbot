@@ -116,6 +116,46 @@ class YouTube(commands.Cog):
         )
         await ctx.send(embed=embed)
 
+    @commands.command(name="testaryt")
+    @commands.has_permissions(administrator=True)
+    async def testaryt(self, ctx, url: str):
+        canal_id = self.extrair_channel_id(url)
+        if not canal_id:
+            canal_id = await self.obter_channel_id_por_username(url)
+            if not canal_id:
+                return await ctx.send("❌ URL inválida.")
+
+        doc = await self.collection.find_one({"channel_id": canal_id})
+        if not doc:
+            return await ctx.send("❌ Canal não cadastrado.")
+
+        feed_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={canal_id}"
+        feed = feedparser.parse(feed_url)
+        if not feed.entries:
+            return await ctx.send("❌ Nenhum vídeo encontrado no feed.")
+
+        video = feed.entries[0]
+        video_url = video.link
+        titulo = video.title
+        canal = self.bot.get_channel(doc["discord_channel_id"])
+        mensagem = doc.get("mensagem", "📢 Novo vídeo postado!")
+
+        embed = discord.Embed(
+            title=titulo,
+            description=mensagem,
+            url=video_url,
+            color=discord.Color.red()
+        )
+        embed.set_author(name="Novo vídeo no YouTube 🎬")
+        embed.set_thumbnail(url="https://www.iconpacks.net/icons/2/free-youtube-logo-icon-2431-thumb.png")
+        embed.set_footer(text="NatanBot • Notificação de vídeo")
+
+        if canal:
+            await canal.send(embed=embed)
+            await ctx.send("✅ Teste enviado com sucesso!")
+        else:
+            await ctx.send("❌ Canal do Discord não encontrado.")
+
     @tasks.loop(minutes=5)
     async def verificar_novos_videos(self):
         await self.bot.wait_until_ready()
@@ -135,7 +175,6 @@ class YouTube(commands.Cog):
                 video_id = video.yt_videoid
                 video_url = video.link
                 titulo = video.title
-                publicado = video.published
 
                 if video_id != ultimo_video:
                     canal = self.bot.get_channel(discord_channel_id)
@@ -149,6 +188,7 @@ class YouTube(commands.Cog):
                         embed.set_author(name="Novo vídeo no YouTube 🎬")
                         embed.set_thumbnail(url="https://www.iconpacks.net/icons/2/free-youtube-logo-icon-2431-thumb.png")
                         embed.set_footer(text="NatanBot • Notificação de vídeo")
+
                         await canal.send(embed=embed)
 
                     await self.collection.update_one(
