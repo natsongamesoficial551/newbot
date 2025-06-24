@@ -161,7 +161,8 @@ class YouTubeSystem(commands.Cog):
             r'youtube\.com/channel/([a-zA-Z0-9_-]+)',
             r'youtube\.com/c/([a-zA-Z0-9_-]+)',
             r'youtube\.com/user/([a-zA-Z0-9_-]+)',
-            r'youtube\.com/@([a-zA-Z0-9_-]+)'
+            r'youtube\.com/@([a-zA-Z0-9_.-]+)',
+            r'youtu\.be/channel/([a-zA-Z0-9_-]+)'
         ]
         
         for pattern in patterns:
@@ -170,24 +171,71 @@ class YouTubeSystem(commands.Cog):
                 return match.group(1)
         return None
 
+    async def resolve_channel_id(self, channel_identifier):
+        """Resolve handle/username para channel ID real"""
+        try:
+            # Se já é um channel ID (começa com UC), retorna
+            if channel_identifier.startswith('UC'):
+                return channel_identifier
+                
+            # Tenta diferentes URLs de RSS feed
+            urls_to_try = [
+                f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_identifier}",
+                f"https://www.youtube.com/feeds/videos.xml?user={channel_identifier}"
+            ]
+            
+            async with aiohttp.ClientSession() as session:
+                for url in urls_to_try:
+                    try:
+                        async with session.get(url, timeout=10) as response:
+                            if response.status == 200:
+                                content = await response.text()
+                                feed = feedparser.parse(content)
+                                if feed.entries:
+                                    return channel_identifier
+                    except:
+                        continue
+                        
+            return None
+            
+        except Exception as e:
+            print(f"❌ Erro ao resolver channel ID: {e}")
+            return None
+
     async def get_channel_rss_feed(self, channel_id):
         """Obtém o feed RSS do canal do YouTube"""
         try:
-            # Para canais com @, precisamos converter para channel ID real
-            if not channel_id.startswith('UC'):
-                # Se não começar com UC, assumimos que é um handle/username
-                rss_url = f"https://www.youtube.com/feeds/videos.xml?user={channel_id}"
+            # Tenta diferentes formatos de URL
+            urls_to_try = []
+            
+            if channel_id.startswith('UC'):
+                urls_to_try.append(f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}")
             else:
-                rss_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+                urls_to_try.extend([
+                    f"https://www.youtube.com/feeds/videos.xml?user={channel_id}",
+                    f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+                ])
             
             async with aiohttp.ClientSession() as session:
-                async with session.get(rss_url) as response:
-                    if response.status == 200:
-                        content = await response.text()
-                        return feedparser.parse(content)
-                    return None
+                for rss_url in urls_to_try:
+                    try:
+                        async with session.get(rss_url, timeout=15) as response:
+                            if response.status == 200:
+                                content = await response.text()
+                                feed = feedparser.parse(content)
+                                if feed.entries:
+                                    return feed
+                    except asyncio.TimeoutError:
+                        print(f"⏰ Timeout ao buscar feed: {rss_url}")
+                        continue
+                    except Exception as e:
+                        print(f"❌ Erro ao buscar feed {rss_url}: {e}")
+                        continue
+                        
+            return None
+            
         except Exception as e:
-            print(f"❌ Erro ao buscar feed RSS: {e}")
+            print(f"❌ Erro geral ao buscar feed RSS: {e}")
             return None
 
     async def check_config_channel(self, ctx):
@@ -243,7 +291,7 @@ class YouTubeSystem(commands.Cog):
             return
 
         # Valida URL do YouTube
-        if 'youtube.com' not in channel_url:
+        if 'youtube.com' not in channel_url and 'youtu.be' not in channel_url:
             embed = discord.Embed(
                 title="❌ URL Inválida",
                 description="Por favor, forneça uma URL válida do YouTube.",
@@ -251,6 +299,14 @@ class YouTubeSystem(commands.Cog):
             )
             await ctx.send(embed=embed)
             return
+
+        # Envia mensagem de carregamento
+        loading_embed = discord.Embed(
+            title="⏳ Processando...",
+            description="Verificando canal do YouTube...",
+            color=discord.Color.orange()
+        )
+        loading_msg = await ctx.send(embed=loading_embed)
 
         success = await self.add_youtube_channel(ctx.guild.id, channel_url, canal_discord.id)
         
@@ -267,7 +323,7 @@ class YouTubeSystem(commands.Cog):
                 color=discord.Color.red()
             )
         
-        await ctx.send(embed=embed)
+        await loading_msg.edit(embed=embed)
 
     @commands.command(name='removeryt')
     @commands.has_permissions(administrator=True)
@@ -377,7 +433,7 @@ class YouTubeSystem(commands.Cog):
         formatted = formatted.replace('{url}', video_url)
         return formatted
 
-    @tasks.loop(minutes=5)  # Verifica a cada 5 minutos
+    @tasks.loop(minutes=10)  # Aumentado para 10 minutos para evitar rate limits
     async def check_new_videos(self):
         """Verifica novos vídeos nos canais monitorados"""
         if not self._connection_ready:
@@ -396,6 +452,8 @@ class YouTubeSystem(commands.Cog):
 
                 for channel_config in youtube_channels:
                     await self.check_channel_for_new_videos(guild_id, channel_config, youtube_message)
+                    # Pequena pausa entre verificações para evitar rate limits
+                    await asyncio.sleep(2)
 
         except Exception as e:
             print(f"❌ Erro na verificação de vídeos: {e}")
@@ -410,16 +468,33 @@ class YouTubeSystem(commands.Cog):
             # Busca feed RSS
             feed = await self.get_channel_rss_feed(channel_id)
             if not feed or not feed.entries:
+                print(f"⚠️ Nenhum vídeo encontrado para canal {channel_id}")
                 return
 
             # Pega o vídeo mais recente
             latest_video = feed.entries[0]
-            latest_video_id = latest_video.id.split(':')[-1]  # Extrai ID do vídeo
+            
+            # Extrai ID do vídeo de diferentes formatos possíveis
+            video_id = None
+            if hasattr(latest_video, 'id'):
+                if ':' in latest_video.id:
+                    video_id = latest_video.id.split(':')[-1]
+                else:
+                    video_id = latest_video.id
+            elif hasattr(latest_video, 'link'):
+                # Extrai ID da URL do vídeo
+                video_match = re.search(r'watch\?v=([a-zA-Z0-9_-]+)', latest_video.link)
+                if video_match:
+                    video_id = video_match.group(1)
+
+            if not video_id:
+                print(f"⚠️ Não foi possível extrair ID do vídeo para canal {channel_id}")
+                return
 
             # Se é um novo vídeo
-            if latest_video_id != last_video_id:
+            if video_id != last_video_id:
                 # Atualiza o último vídeo ID
-                await self.update_last_video_id(guild_id, channel_id, latest_video_id)
+                await self.update_last_video_id(guild_id, channel_id, video_id)
 
                 # Envia notificação (apenas se não for o primeiro check)
                 if last_video_id is not None:
@@ -430,9 +505,10 @@ class YouTubeSystem(commands.Cog):
                         latest_video.link,
                         youtube_message
                     )
+                    print(f"📺 Novo vídeo detectado para canal {channel_id}: {latest_video.title}")
 
         except Exception as e:
-            print(f"❌ Erro ao verificar canal {channel_config['channel_id']}: {e}")
+            print(f"❌ Erro ao verificar canal {channel_config.get('channel_id', 'unknown')}: {e}")
 
     async def update_last_video_id(self, guild_id, channel_id, video_id):
         """Atualiza o ID do último vídeo verificado"""
@@ -456,6 +532,7 @@ class YouTubeSystem(commands.Cog):
         try:
             channel = self.bot.get_channel(discord_channel_id)
             if not channel:
+                print(f"❌ Canal Discord {discord_channel_id} não encontrado")
                 return
 
             formatted_message = self.format_youtube_message(message_template, title, channel_name, video_url)
@@ -471,9 +548,12 @@ class YouTubeSystem(commands.Cog):
             embed.timestamp = datetime.utcnow()
 
             await channel.send(embed=embed)
+            print(f"✅ Notificação enviada para {channel.name}")
 
         except discord.Forbidden:
             print(f"❌ Sem permissão para enviar no canal {discord_channel_id}")
+        except discord.HTTPException as e:
+            print(f"❌ Erro HTTP ao enviar notificação: {e}")
         except Exception as e:
             print(f"❌ Erro ao enviar notificação: {e}")
 
@@ -481,6 +561,14 @@ class YouTubeSystem(commands.Cog):
     async def before_check_videos(self):
         """Aguarda o bot estar pronto antes de iniciar o loop"""
         await self.bot.wait_until_ready()
+        print("🔄 Sistema YouTube iniciado - verificação a cada 10 minutos")
+
+    @check_new_videos.error
+    async def check_videos_error_handler(self, error):
+        """Lida com erros no loop de verificação"""
+        print(f"❌ Erro no loop de verificação YouTube: {error}")
+        # Aguarda um pouco antes de tentar novamente
+        await asyncio.sleep(60)
 
     @commands.command(name='helpyt')
     async def help_youtube(self, ctx):
@@ -521,7 +609,7 @@ class YouTubeSystem(commands.Cog):
             inline=False
         )
         
-        embed.set_footer(text="Todos os comandos requerem permissão de Administrador • Verificação automática a cada 5 minutos")
+        embed.set_footer(text="Todos os comandos requerem permissão de Administrador • Verificação automática a cada 10 minutos")
         await ctx.send(embed=embed)
 
     async def cog_unload(self):
