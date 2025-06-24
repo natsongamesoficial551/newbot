@@ -15,379 +15,414 @@ class Economia(commands.Cog):
         self.shop_collection = None
         self.vip_collection = None
         self._connection_ready = False
-        # Inicializa a conexão com MongoDB
         self.bot.loop.create_task(self.init_database())
         
-        # Configurações do sistema
+        # Configurações base
         self.daily_reward = 1000
-        self.work_cooldown = 3600  # 1 hora
-        self.crime_cooldown = 7200  # 2 horas
-        self.daily_cooldown = 86400  # 24 horas
+        self.work_cooldown = 3600
+        self.crime_cooldown = 7200
         
-        # Multiplicadores VIP
-        self.vip_daily_multiplier = 2.0
-        self.vip_work_multiplier = 1.5
-        self.vip_crime_success_bonus = 15
-        self.vip_rob_success_bonus = 20
-        
-        # Empregos disponíveis
+        # Jobs e crimes
         self.jobs = {
-            "entregador": {"salary": (200, 800), "desc": "Entrega comidas pela cidade"},
-            "caixa": {"salary": (300, 600), "desc": "Atende clientes no supermercado"},
-            "empresario": {"salary": (800, 2000), "desc": "Gerencia uma empresa"},
-            "programador": {"salary": (1000, 1500), "desc": "Desenvolve aplicações"},
-            "medico": {"salary": (1500, 2500), "desc": "Cuida da saúde das pessoas"}
+            "entregador": {"salary": (200, 800), "desc": "Entrega comidas"},
+            "caixa": {"salary": (300, 600), "desc": "Atende clientes"},
+            "programador": {"salary": (1000, 1500), "desc": "Desenvolve apps"},
+            "medico": {"salary": (1500, 2500), "desc": "Cuida da saúde"}
         }
         
-        # Crimes disponíveis
         self.crimes = {
             "roubar_loja": {"min": 100, "max": 1000, "success": 60},
-            "hackear_banco": {"min": 500, "max": 3000, "success": 30},
-            "contrabando": {"min": 1000, "max": 5000, "success": 20},
+            "hackear": {"min": 500, "max": 3000, "success": 30},
             "furto": {"min": 50, "max": 300, "success": 80}
         }
 
     async def init_database(self):
-        """Inicializa a conexão com MongoDB"""
         try:
             mongo_uri = os.getenv("MONGO_URI")
             if not mongo_uri:
-                print("❌ MONGO_URI não encontrada nas variáveis de ambiente!")
                 return
             
-            print("🔄 Conectando ao MongoDB (Economia)...")
             self.client = AsyncIOMotorClient(mongo_uri)
-            
-            # Testa a conexão
             await self.client.admin.command('ping')
             
             self.db = self.client['discord_bot']
             self.users_collection = self.db['users']
             self.shop_collection = self.db['shop']
-            self.vip_collection = self.db['vip_users']
+            self.vip_collection = self.db['vip_data']
             self._connection_ready = True
             
-            # Inicializa dados da loja
             await self.initialize_shop_data()
-            
-            print("✅ Conectado ao MongoDB (Economia) com sucesso!")
-            
         except Exception as e:
-            print(f"❌ Erro ao conectar com MongoDB (Economia): {e}")
             self._connection_ready = False
 
     async def ensure_connection(self):
-        """Garante que a conexão com MongoDB está ativa"""
         if not self._connection_ready:
             await self.init_database()
         return self._connection_ready
 
     async def initialize_shop_data(self):
-        """Inicializa dados da loja no MongoDB se não existir"""
         try:
             if not await self.ensure_connection():
                 return
-                
             count = await self.shop_collection.count_documents({})
             if count == 0:
-                shop_items = [
+                items = [
                     {"item": "smartphone", "price": 1500, "desc": "Smartphone moderno"},
                     {"item": "notebook", "price": 3000, "desc": "Notebook para trabalho"},
                     {"item": "carro", "price": 50000, "desc": "Carro popular"},
                     {"item": "casa", "price": 200000, "desc": "Casa própria"}
                 ]
-                await self.shop_collection.insert_many(shop_items)
-                print("✅ Dados da loja inicializados no MongoDB")
-        except Exception as e:
-            print(f"❌ Erro ao inicializar loja: {e}")
-
-    async def get_shop_data(self):
-        """Obtém dados da loja do MongoDB"""
-        try:
-            if not await self.ensure_connection():
-                return {}
-                
-            shop_data = {}
-            async for item in self.shop_collection.find():
-                shop_data[item["item"]] = {
-                    "price": item["price"],
-                    "desc": item["desc"]
-                }
-            return shop_data
-        except Exception as e:
-            print(f"❌ Erro ao buscar dados da loja: {e}")
-            return {}
+                await self.shop_collection.insert_many(items)
+        except:
+            pass
 
     async def is_vip(self, user_id, guild_id):
-        """Verifica se usuário é VIP"""
+        """Verifica se usuário é VIP usando a collection VIP"""
         try:
             if not await self.ensure_connection():
                 return False
-                
-            user_key = f"{guild_id}_{user_id}"
-            vip_data = await self.vip_collection.find_one({"user_key": user_key})
+            
+            vip_data = await self.vip_collection.find_one({
+                "user_id": str(user_id),
+                "guild_id": str(guild_id)
+            })
             
             if vip_data:
-                expiry_date = datetime.fromisoformat(vip_data['expiry'])
-                return datetime.now() < expiry_date
+                expiry = vip_data['expiry']
+                return datetime.now() < expiry
             return False
-        except Exception as e:
-            print(f"❌ Erro ao verificar VIP: {e}")
+        except:
             return False
 
+    async def get_vip_multipliers(self, user_id, guild_id):
+        """Retorna multiplicadores VIP"""
+        if await self.is_vip(user_id, guild_id):
+            return {
+                "daily": 2.0,
+                "work": 1.5, 
+                "crime_success": 15,
+                "rob_success": 20,
+                "bet_luck": 10
+            }
+        return {
+            "daily": 1.0,
+            "work": 1.0,
+            "crime_success": 0,
+            "rob_success": 0,
+            "bet_luck": 0
+        }
+
     async def get_user_data(self, user_id):
-        """Obtém dados do usuário do MongoDB"""
         try:
             if not await self.ensure_connection():
                 return self.get_default_user_data(str(user_id))
-                
             user_id = str(user_id)
-            user_data = await self.users_collection.find_one({"user_id": user_id})
-            
-            if not user_data:
-                default_data = self.get_default_user_data(user_id)
-                await self.users_collection.insert_one(default_data)
-                return default_data
-            
-            return user_data
-        except Exception as e:
-            print(f"❌ Erro ao buscar dados do usuário: {e}")
+            data = await self.users_collection.find_one({"user_id": user_id})
+            if not data:
+                data = self.get_default_user_data(user_id)
+                await self.users_collection.insert_one(data)
+            return data
+        except:
             return self.get_default_user_data(str(user_id))
 
     def get_default_user_data(self, user_id):
-        """Retorna dados padrão do usuário"""
         return {
-            "user_id": user_id,
-            "balance": 0,
-            "bank": 0,
-            "inventory": {},
-            "job": None,
-            "last_daily": None,
-            "last_work": None,
-            "last_crime": None,
-            "is_boss": False,
-            "employees": []
+            "user_id": user_id, "balance": 0, "bank": 0, "inventory": {},
+            "job": None, "last_daily": None, "last_work": None, "last_crime": None,
+            "is_boss": False, "employees": []
         }
 
     async def update_user_data(self, user_id, data):
-        """Atualiza dados do usuário no MongoDB"""
         try:
             if not await self.ensure_connection():
-                print("❌ Conexão com MongoDB não está disponível para atualização")
                 return False
-                
-            user_id = str(user_id)
             await self.users_collection.update_one(
-                {"user_id": user_id},
-                {"$set": data},
-                upsert=True
+                {"user_id": str(user_id)}, {"$set": data}, upsert=True
             )
             return True
-        except Exception as e:
-            print(f"❌ Erro ao atualizar dados do usuário: {e}")
+        except:
             return False
 
     def format_money(self, amount):
-        """Formata valor em reais"""
         return f"R$ {amount:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
     @commands.command(name='saldo', aliases=['bal', 'balance'])
     async def balance(self, ctx, user: discord.Member = None):
-        """Mostra o saldo do usuário"""
         if user is None:
             user = ctx.author
-        
         data = await self.get_user_data(user.id)
         is_vip_user = await self.is_vip(user.id, ctx.guild.id)
         
-        embed = discord.Embed(
-            title=f"💰 Saldo de {user.display_name}",
-            color=0xFFD700 if is_vip_user else 0x00ff00
-        )
+        embed = discord.Embed(title=f"💰 {user.display_name}", color=0xFFD700 if is_vip_user else 0x00ff00)
         embed.add_field(name="Carteira", value=self.format_money(data["balance"]), inline=True)
         embed.add_field(name="Banco", value=self.format_money(data["bank"]), inline=True)
         embed.add_field(name="Total", value=self.format_money(data["balance"] + data["bank"]), inline=True)
-        
         if data["job"]:
             embed.add_field(name="Emprego", value=data["job"].title(), inline=False)
-        
         if is_vip_user:
-            embed.add_field(name="👑 Status", value="VIP ATIVO", inline=False)
-        
+            embed.add_field(name="👑 Status", value="VIP ATIVO - Bônus em todas atividades!", inline=False)
         await ctx.send(embed=embed)
 
     @commands.command(name='diario', aliases=['daily'])
     async def daily(self, ctx):
-        """Recompensa diária"""
-        user_data = await self.get_user_data(ctx.author.id)
+        data = await self.get_user_data(ctx.author.id)
         now = datetime.now()
-        is_vip_user = await self.is_vip(ctx.author.id, ctx.guild.id)
+        multipliers = await self.get_vip_multipliers(ctx.author.id, ctx.guild.id)
         
-        if user_data["last_daily"]:
-            last_daily = datetime.fromisoformat(user_data["last_daily"])
-            if now - last_daily < timedelta(days=1):
-                time_left = timedelta(days=1) - (now - last_daily)
-                hours = int(time_left.total_seconds() // 3600)
-                minutes = int((time_left.total_seconds() % 3600) // 60)
-                
-                embed = discord.Embed(
-                    title="⏰ Recompensa Diária",
-                    description=f"Você já coletou hoje! Volte em {hours}h {minutes}m",
-                    color=0xff0000
-                )
-                return await ctx.send(embed=embed)
+        if data["last_daily"]:
+            last = datetime.fromisoformat(data["last_daily"])
+            if now - last < timedelta(days=1):
+                left = timedelta(days=1) - (now - last)
+                h, m = int(left.total_seconds() // 3600), int((left.total_seconds() % 3600) // 60)
+                return await ctx.send(embed=discord.Embed(title="⏰ Cooldown", description=f"Volte em {h}h {m}m", color=0xff0000))
         
-        reward = self.daily_reward
-        if is_vip_user:
-            reward = int(reward * self.vip_daily_multiplier)
+        reward = int(self.daily_reward * multipliers["daily"])
+        success = await self.update_user_data(ctx.author.id, {"balance": data["balance"] + reward, "last_daily": now.isoformat()})
         
-        # Atualiza dados no MongoDB
-        update_data = {
-            "balance": user_data["balance"] + reward,
-            "last_daily": now.isoformat()
-        }
-        success = await self.update_user_data(ctx.author.id, update_data)
-        
-        if not success:
-            return await ctx.send("❌ Erro ao processar recompensa. Tente novamente.")
-        
-        embed = discord.Embed(
-            title="🎁 Recompensa Diária",
-            description=f"Você recebeu {self.format_money(reward)}!",
-            color=0xFFD700 if is_vip_user else 0x00ff00
-        )
-        
-        if is_vip_user:
-            embed.add_field(name="👑 Bônus VIP", value=f"2x recompensa aplicada!", inline=False)
-        
-        await ctx.send(embed=embed)
+        if success:
+            is_vip = multipliers["daily"] > 1.0
+            embed = discord.Embed(title="🎁 Recompensa Diária", description=f"Você recebeu {self.format_money(reward)}!", color=0xFFD700 if is_vip else 0x00ff00)
+            if is_vip:
+                embed.add_field(name="👑 Bônus VIP", value="2x recompensa aplicada!", inline=False)
+            await ctx.send(embed=embed)
 
     @commands.command(name='trabalhar', aliases=['work'])
     async def work(self, ctx):
-        """Trabalhar para ganhar dinheiro"""
-        user_data = await self.get_user_data(ctx.author.id)
+        data = await self.get_user_data(ctx.author.id)
         now = datetime.now()
-        is_vip_user = await self.is_vip(ctx.author.id, ctx.guild.id)
+        multipliers = await self.get_vip_multipliers(ctx.author.id, ctx.guild.id)
         
-        if not user_data["job"]:
-            available_jobs = list(self.jobs.keys())
-            new_job = random.choice(available_jobs)
-            
-            await self.update_user_data(ctx.author.id, {"job": new_job})
-            user_data["job"] = new_job
-            
-            embed = discord.Embed(
-                title="💼 Novo Emprego",
-                description=f"Você conseguiu um emprego como {new_job}!",
-                color=0x00ff00
-            )
+        if not data["job"]:
+            job = random.choice(list(self.jobs.keys()))
+            await self.update_user_data(ctx.author.id, {"job": job})
+            data["job"] = job
+            return await ctx.send(embed=discord.Embed(title="💼 Novo Emprego", description=f"Você conseguiu trabalho como {job}!", color=0x00ff00))
+        
+        if data["last_work"]:
+            last = datetime.fromisoformat(data["last_work"])
+            if now - last < timedelta(seconds=self.work_cooldown):
+                left = timedelta(seconds=self.work_cooldown) - (now - last)
+                m = int(left.total_seconds() // 60)
+                return await ctx.send(embed=discord.Embed(title="⏰ Cooldown", description=f"Volte em {m} min", color=0xff0000))
+        
+        job = data["job"]
+        min_sal, max_sal = self.jobs[job]["salary"]
+        earnings = int(random.randint(min_sal, max_sal) * multipliers["work"])
+        
+        success = await self.update_user_data(ctx.author.id, {"balance": data["balance"] + earnings, "last_work": now.isoformat()})
+        if success:
+            is_vip = multipliers["work"] > 1.0
+            embed = discord.Embed(title="💼 Trabalho Concluído", description=f"Trabalhou como {job} e ganhou {self.format_money(earnings)}!", color=0xFFD700 if is_vip else 0x00ff00)
+            if is_vip:
+                embed.add_field(name="👑 Bônus VIP", value="50% extra aplicado!", inline=False)
             await ctx.send(embed=embed)
+
+    @commands.command(name='crime')
+    async def crime(self, ctx):
+        data = await self.get_user_data(ctx.author.id)
+        now = datetime.now()
+        multipliers = await self.get_vip_multipliers(ctx.author.id, ctx.guild.id)
         
-        if user_data["last_work"]:
-            last_work = datetime.fromisoformat(user_data["last_work"])
-            if now - last_work < timedelta(seconds=self.work_cooldown):
-                time_left = timedelta(seconds=self.work_cooldown) - (now - last_work)
-                minutes = int(time_left.total_seconds() // 60)
-                
-                embed = discord.Embed(
-                    title="⏰ Cooldown",
-                    description=f"Você precisa descansar! Volte em {minutes} minutos.",
-                    color=0xff0000
-                )
-                return await ctx.send(embed=embed)
+        if data["last_crime"]:
+            last = datetime.fromisoformat(data["last_crime"])
+            if now - last < timedelta(seconds=self.crime_cooldown):
+                left = timedelta(seconds=self.crime_cooldown) - (now - last)
+                h = int(left.total_seconds() // 3600)
+                return await ctx.send(embed=discord.Embed(title="⏰ Cooldown", description=f"Volte em {h}h", color=0xff0000))
         
-        job = user_data["job"]
-        min_salary, max_salary = self.jobs[job]["salary"]
+        crime = random.choice(list(self.crimes.keys()))
+        crime_data = self.crimes[crime]
+        success_rate = crime_data["success"] + multipliers["crime_success"]
         
-        # Bônus VIP: chance de ganhar mais
-        if is_vip_user and random.randint(1, 100) <= 30:
-            max_salary = int(max_salary * 1.5)
-        
-        earnings = random.randint(min_salary, max_salary)
-        
-        if is_vip_user:
-            earnings = int(earnings * self.vip_work_multiplier)
-        
-        # Atualiza dados no MongoDB
-        update_data = {
-            "balance": user_data["balance"] + earnings,
-            "last_work": now.isoformat()
-        }
-        success = await self.update_user_data(ctx.author.id, update_data)
-        
-        if not success:
-            return await ctx.send("❌ Erro ao processar trabalho. Tente novamente.")
-        
-        embed = discord.Embed(
-            title="💼 Trabalho Concluído",
-            description=f"Você trabalhou como {job} e ganhou {self.format_money(earnings)}!",
-            color=0xFFD700 if is_vip_user else 0x00ff00
-        )
-        
-        if is_vip_user:
-            embed.add_field(name="👑 Bônus VIP", value="1.5x salário + chance de bônus!", inline=False)
+        if random.randint(1, 100) <= success_rate:
+            reward = random.randint(crime_data["min"], crime_data["max"])
+            success = await self.update_user_data(ctx.author.id, {"balance": data["balance"] + reward, "last_crime": now.isoformat()})
+            if success:
+                is_vip = multipliers["crime_success"] > 0
+                embed = discord.Embed(title="🎭 Crime Bem-sucedido", description=f"Você conseguiu {self.format_money(reward)} com {crime.replace('_', ' ')}!", color=0x00ff00)
+                if is_vip:
+                    embed.add_field(name="👑 Bônus VIP", value="+15% chance de sucesso!", inline=False)
+        else:
+            fine = random.randint(100, 500)
+            new_balance = max(0, data["balance"] - fine)
+            success = await self.update_user_data(ctx.author.id, {"balance": new_balance, "last_crime": now.isoformat()})
+            if success:
+                embed = discord.Embed(title="🚔 Crime Fracassou", description=f"Você foi pego e pagou {self.format_money(fine)} de multa!", color=0xff0000)
         
         await ctx.send(embed=embed)
+
+    @commands.command(name='roubar', aliases=['rob'])
+    async def rob(self, ctx, user: discord.Member):
+        if user == ctx.author:
+            return await ctx.send("❌ Você não pode roubar a si mesmo!")
+        
+        robber_data = await self.get_user_data(ctx.author.id)
+        victim_data = await self.get_user_data(user.id)
+        multipliers = await self.get_vip_multipliers(ctx.author.id, ctx.guild.id)
+        
+        if victim_data["balance"] < 100:
+            return await ctx.send("❌ Esta pessoa é muito pobre para ser roubada!")
+        
+        success_rate = 40 + multipliers["rob_success"]
+        
+        if random.randint(1, 100) <= success_rate:
+            stolen = min(victim_data["balance"] // 4, 5000)
+            await self.update_user_data(ctx.author.id, {"balance": robber_data["balance"] + stolen})
+            await self.update_user_data(user.id, {"balance": victim_data["balance"] - stolen})
+            is_vip = multipliers["rob_success"] > 0
+            embed = discord.Embed(title="💰 Roubo Bem-sucedido", description=f"Você roubou {self.format_money(stolen)} de {user.display_name}!", color=0x00ff00)
+            if is_vip:
+                embed.add_field(name="👑 Bônus VIP", value="+20% chance de sucesso!", inline=False)
+        else:
+            fine = random.randint(200, 800)
+            new_balance = max(0, robber_data["balance"] - fine)
+            await self.update_user_data(ctx.author.id, {"balance": new_balance})
+            embed = discord.Embed(title="🚔 Roubo Fracassou", description=f"Você foi pego e pagou {self.format_money(fine)}!", color=0xff0000)
+        
+        await ctx.send(embed=embed)
+
+    @commands.command(name='apostar', aliases=['bet'])
+    async def bet(self, ctx, amount: int):
+        data = await self.get_user_data(ctx.author.id)
+        multipliers = await self.get_vip_multipliers(ctx.author.id, ctx.guild.id)
+        
+        if amount <= 0 or amount > data["balance"]:
+            return await ctx.send("❌ Valor inválido ou saldo insuficiente!")
+        
+        win_chance = 45 + multipliers["bet_luck"]
+        
+        if random.randint(1, 100) <= win_chance:
+            winnings = amount * 2
+            new_balance = data["balance"] + amount
+            is_vip = multipliers["bet_luck"] > 0
+            embed = discord.Embed(title="🎰 Você Ganhou!", description=f"Ganhou {self.format_money(winnings)}!", color=0x00ff00)
+            if is_vip:
+                embed.add_field(name="👑 Bônus VIP", value="+10% chance de vitória!", inline=False)
+        else:
+            new_balance = data["balance"] - amount
+            embed = discord.Embed(title="🎰 Você Perdeu!", description=f"Perdeu {self.format_money(amount)}!", color=0xff0000)
+        
+        await self.update_user_data(ctx.author.id, {"balance": new_balance})
+        await ctx.send(embed=embed)
+
+    @commands.command(name='inventario', aliases=['inv'])
+    async def inventory(self, ctx, user: discord.Member = None):
+        if user is None:
+            user = ctx.author
+        data = await self.get_user_data(user.id)
+        inv = data.get("inventory", {})
+        
+        embed = discord.Embed(title=f"🎒 Inventário de {user.display_name}", color=0x0099ff)
+        if inv:
+            for item, qty in inv.items():
+                embed.add_field(name=item.title(), value=f"Quantidade: {qty}", inline=True)
+        else:
+            embed.description = "Inventário vazio"
+        await ctx.send(embed=embed)
+
+    @commands.command(name='depositar', aliases=['dep'])
+    async def deposit(self, ctx, amount: str):
+        data = await self.get_user_data(ctx.author.id)
+        
+        if amount.lower() == "all":
+            amount = data["balance"]
+        else:
+            try:
+                amount = int(amount)
+            except:
+                return await ctx.send("❌ Valor inválido!")
+        
+        if amount <= 0 or amount > data["balance"]:
+            return await ctx.send("❌ Valor inválido ou saldo insuficiente!")
+        
+        success = await self.update_user_data(ctx.author.id, {"balance": data["balance"] - amount, "bank": data["bank"] + amount})
+        if success:
+            await ctx.send(embed=discord.Embed(title="🏦 Depósito", description=f"Depositado {self.format_money(amount)}!", color=0x00ff00))
+
+    @commands.command(name='sacar', aliases=['withdraw'])
+    async def withdraw(self, ctx, amount: str):
+        data = await self.get_user_data(ctx.author.id)
+        
+        if amount.lower() == "all":
+            amount = data["bank"]
+        else:
+            try:
+                amount = int(amount)
+            except:
+                return await ctx.send("❌ Valor inválido!")
+        
+        if amount <= 0 or amount > data["bank"]:
+            return await ctx.send("❌ Valor inválido ou saldo bancário insuficiente!")
+        
+        success = await self.update_user_data(ctx.author.id, {"balance": data["balance"] + amount, "bank": data["bank"] - amount})
+        if success:
+            await ctx.send(embed=discord.Embed(title="🏦 Saque", description=f"Sacado {self.format_money(amount)}!", color=0x00ff00))
 
     @commands.command(name='loja', aliases=['shop'])
     async def shop(self, ctx):
-        """Mostra itens da loja"""
-        shop_data = await self.get_shop_data()
-        embed = discord.Embed(title="🛒 Loja", color=0x0099ff)
-        
-        for item, data in shop_data.items():
-            embed.add_field(
-                name=item.title(),
-                value=f"{data['desc']}\n**Preço:** {self.format_money(data['price'])}",
-                inline=True
-            )
-        
-        embed.set_footer(text="Use !comprar <item> para comprar")
-        await ctx.send(embed=embed)
+        try:
+            shop_data = {}
+            if await self.ensure_connection():
+                async for item in self.shop_collection.find():
+                    shop_data[item["item"]] = {"price": item["price"], "desc": item["desc"]}
+            
+            embed = discord.Embed(title="🛒 Loja", color=0x0099ff)
+            for item, data in shop_data.items():
+                embed.add_field(name=item.title(), value=f"{data['desc']}\n{self.format_money(data['price'])}", inline=True)
+            embed.set_footer(text="Use !comprar <item>")
+            await ctx.send(embed=embed)
+        except:
+            await ctx.send("❌ Erro ao carregar loja")
 
     @commands.command(name='comprar', aliases=['buy'])
     async def buy(self, ctx, *, item_name: str):
-        """Comprar um item da loja"""
-        user_data = await self.get_user_data(ctx.author.id)
-        shop_data = await self.get_shop_data()
+        data = await self.get_user_data(ctx.author.id)
         item_name = item_name.lower()
         
-        if item_name not in shop_data:
-            return await ctx.send("❌ Item não encontrado!")
-        
-        price = shop_data[item_name]["price"]
-        
-        if user_data["balance"] < price:
-            return await ctx.send("❌ Saldo insuficiente!")
-        
-        # Atualiza inventário
-        inventory = user_data.get("inventory", {})
-        if item_name not in inventory:
-            inventory[item_name] = 0
-        inventory[item_name] += 1
-        
-        # Atualiza dados no MongoDB
-        update_data = {
-            "balance": user_data["balance"] - price,
-            "inventory": inventory
-        }
-        success = await self.update_user_data(ctx.author.id, update_data)
-        
-        if not success:
-            return await ctx.send("❌ Erro ao processar compra. Tente novamente.")
-        
-        embed = discord.Embed(
-            title="🛒 Compra Realizada",
-            description=f"Você comprou {item_name} por {self.format_money(price)}!",
-            color=0x00ff00
-        )
+        try:
+            shop_item = await self.shop_collection.find_one({"item": item_name})
+            if not shop_item:
+                return await ctx.send("❌ Item não encontrado!")
+            
+            price = shop_item["price"]
+            if data["balance"] < price:
+                return await ctx.send("❌ Saldo insuficiente!")
+            
+            inv = data.get("inventory", {})
+            inv[item_name] = inv.get(item_name, 0) + 1
+            
+            success = await self.update_user_data(ctx.author.id, {"balance": data["balance"] - price, "inventory": inv})
+            if success:
+                await ctx.send(embed=discord.Embed(title="🛒 Compra Realizada", description=f"Comprou {item_name} por {self.format_money(price)}!", color=0x00ff00))
+        except:
+            await ctx.send("❌ Erro na compra")
+
+    @commands.command(name='vantagens', aliases=['vipinfo'])
+    async def vip_benefits(self, ctx):
+        """Mostra as vantagens VIP"""
+        embed = discord.Embed(title="👑 Vantagens VIP", description="Benefícios exclusivos para membros VIP:", color=0xFFD700)
+        embed.add_field(name="💰 Recompensa Diária", value="**2x** mais dinheiro", inline=True)
+        embed.add_field(name="💼 Trabalho", value="**50%** mais salário", inline=True)
+        embed.add_field(name="🎭 Crime", value="**+15%** chance sucesso", inline=True)
+        embed.add_field(name="💰 Roubo", value="**+20%** chance sucesso", inline=True)
+        embed.add_field(name="🎰 Apostas", value="**+10%** chance vitória", inline=True)
+        embed.add_field(name="👑 Status", value="Badge VIP exclusivo", inline=True)
+        embed.set_footer(text="Adquira VIP com um administrador!")
         await ctx.send(embed=embed)
 
+    @commands.has_permissions(administrator=True)
+    @commands.command(name='dar', aliases=['give'])
+    async def give_money(self, ctx, user: discord.Member, amount: int):
+        data = await self.get_user_data(user.id)
+        success = await self.update_user_data(user.id, {"balance": data["balance"] + amount})
+        
+        if success:
+            embed = discord.Embed(title="💰 Dinheiro Dado", description=f"Você deu {self.format_money(amount)} para {user.display_name}!", color=0x00ff00)
+            await ctx.send(embed=embed)
+
     async def cog_unload(self):
-        """Fecha a conexão com MongoDB quando o cog é descarregado"""
         if self.client:
             self.client.close()
-            print("🔌 Conexão com MongoDB (Economia) fechada")
 
 async def setup(bot):
     await bot.add_cog(Economia(bot))
