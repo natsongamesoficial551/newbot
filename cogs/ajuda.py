@@ -127,6 +127,26 @@ class Ajuda(commands.Cog):
             "`!statusmanual`"
         ), inline=False)
 
+        embed.add_field(name="🎭 Roleplay", value=(
+            "`!abracar @usuário`\n"
+            "`!beijar @usuário`\n"
+            "`!bofetada @usuário`\n"
+            "`!cafune @usuário`\n"
+            "`!tocaaqui @usuário`\n"
+            "`!atacar @usuário`\n"
+            "`!dancar @usuário`\n"
+            "`!roleplay`"
+        ), inline=False)
+
+        embed.add_field(name="🎮 Diversão", value=(
+            "`!evento`\n"
+            "`!ship @user1 @user2`\n"
+            "`!rolar 2 6`\n"
+            "`!jankenpon pedra`\n"
+            "`!vaporwave texto`\n"
+            "`!avaliar_waifu nome`"
+        ), inline=False)
+
         embed.set_footer(text="Use os comandos com ! no início. Ex: !ping")
         await ctx.send(embed=embed)
 
