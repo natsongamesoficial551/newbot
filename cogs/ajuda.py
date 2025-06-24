@@ -108,13 +108,6 @@ class Ajuda(commands.Cog):
             "`!dar / !give`"
         ), inline=False)
 
-        embed.add_field(name="📺 YouTube", value=(
-            "`!adicionaryt <URL> #canal` - Adiciona canal do YouTube\n"
-            "`!removeryt <URL>` - Remove canal do monitoramento\n"
-            "`!mensagemyt <mensagem>` - Define mensagem da notificação\n"
-            "`!listaryt` - Lista canais e mensagem atual"
-        ), inline=False)
-
         embed.add_field(name="🔧 Utilidades", value=(
             "`!botinfo`\n"
             "`!userinfo`\n"
