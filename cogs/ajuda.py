@@ -96,7 +96,7 @@ class Ajuda(commands.Cog):
             "`!sacar / !withdraw`\n"
             "`!loja / !shop`\n"
             "`!comprar / !buy`\n"
-            "`!vender / !sell`\n`
+            "`!vender / !sell`\n"
             "`!crime`\n"
             "`!roubar / !rob`\n"
             "`!apostar / !bet`\n"
@@ -111,7 +111,7 @@ class Ajuda(commands.Cog):
         embed.add_field(name="🔧 Utilidades", value=(
             "`!botinfo`\n"
             "`!userinfo`\n"
-            "`!serverinfo`\n`
+            "`!serverinfo`\n"
             "`!ping`\n"
             "`!avatar`\n"
             "`!banner`\n"
@@ -130,7 +130,7 @@ class Ajuda(commands.Cog):
         embed.add_field(name="🎭 Roleplay", value=(
             "`!abracar @usuário`\n"
             "`!beijar @usuário`\n"
-            "`!bofetada @usuário`\n`
+            "`!bofetada @usuário`\n"
             "`!cafune @usuário`\n"
             "`!tocaaqui @usuário`\n"
             "`!atacar @usuário`\n"
