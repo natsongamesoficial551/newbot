@@ -18,8 +18,6 @@ class YouTubeSystem(commands.Cog):
         self._connection_ready = False
         # Inicializa a conexão com MongoDB
         self.bot.loop.create_task(self.init_database())
-        # Inicia o loop de verificação de novos vídeos
-        self.check_new_videos.start()
 
     async def init_database(self):
         """Inicializa a conexão com MongoDB"""
@@ -42,6 +40,10 @@ class YouTubeSystem(commands.Cog):
             self._connection_ready = True
             
             print("✅ Conectado ao MongoDB com sucesso! (YouTube System)")
+            
+            # Inicia o loop APENAS após conexão bem-sucedida
+            if not self.check_new_videos.is_running():
+                self.check_new_videos.start()
             
         except Exception as e:
             print(f"❌ Erro ao conectar com MongoDB (YouTube): {e}")
@@ -90,6 +92,61 @@ class YouTubeSystem(commands.Cog):
             print(f"❌ Erro ao salvar configuração YouTube: {e}")
             return False
 
+    def extract_channel_id(self, url):
+        """Extrai o ID do canal do YouTube da URL"""
+        patterns = [
+            r'youtube\.com/channel/([a-zA-Z0-9_-]+)',
+            r'youtube\.com/c/([a-zA-Z0-9_-]+)',
+            r'youtube\.com/user/([a-zA-Z0-9_-]+)',
+            r'youtube\.com/@([a-zA-Z0-9_.-]+)',
+            r'youtu\.be/channel/([a-zA-Z0-9_-]+)'
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, url)
+            if match:
+                return match.group(1)
+        return None
+
+    async def get_channel_info_from_url(self, channel_url):
+        """Obtém informações do canal a partir da URL"""
+        try:
+            channel_id = self.extract_channel_id(channel_url)
+            if not channel_id:
+                return None, None
+            
+            # Tenta diferentes formatos de RSS feed
+            urls_to_try = [
+                f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}",
+                f"https://www.youtube.com/feeds/videos.xml?user={channel_id}"
+            ]
+            
+            async with aiohttp.ClientSession() as session:
+                for rss_url in urls_to_try:
+                    try:
+                        async with session.get(rss_url, timeout=10) as response:
+                            if response.status == 200:
+                                content = await response.text()
+                                feed = feedparser.parse(content)
+                                if feed.entries and hasattr(feed, 'feed'):
+                                    # Tenta extrair o ID real do canal do feed
+                                    real_channel_id = None
+                                    if hasattr(feed.feed, 'id'):
+                                        # O ID do feed geralmente é algo como "yt:channel:UCxxxxx"
+                                        if ':' in feed.feed.id:
+                                            real_channel_id = feed.feed.id.split(':')[-1]
+                                    
+                                    return real_channel_id or channel_id, feed.feed.title
+                    except Exception as e:
+                        print(f"❌ Erro ao testar URL {rss_url}: {e}")
+                        continue
+                        
+            return None, None
+            
+        except Exception as e:
+            print(f"❌ Erro ao obter informações do canal: {e}")
+            return None, None
+
     async def add_youtube_channel(self, guild_id, channel_url, discord_channel_id):
         """Adiciona um canal do YouTube à lista de monitoramento"""
         try:
@@ -97,9 +154,12 @@ class YouTubeSystem(commands.Cog):
                 return False
             
             guild_id = str(guild_id)
-            channel_id = self.extract_channel_id(channel_url)
+            
+            # Obtém informações do canal
+            channel_id, channel_name = await self.get_channel_info_from_url(channel_url)
             
             if not channel_id:
+                print(f"❌ Não foi possível obter informações do canal: {channel_url}")
                 return False
             
             # Busca configuração atual
@@ -109,12 +169,14 @@ class YouTubeSystem(commands.Cog):
             # Verifica se o canal já existe
             for channel in youtube_channels:
                 if channel['channel_id'] == channel_id:
+                    print(f"❌ Canal já existe: {channel_id}")
                     return False  # Canal já existe
             
             # Adiciona novo canal
             new_channel = {
                 'channel_id': channel_id,
                 'channel_url': channel_url,
+                'channel_name': channel_name or 'Nome não encontrado',
                 'discord_channel_id': discord_channel_id,
                 'last_video_id': None,
                 'added_date': datetime.utcnow().isoformat()
@@ -122,8 +184,10 @@ class YouTubeSystem(commands.Cog):
             
             youtube_channels.append(new_channel)
             
-            await self.set_guild_config(guild_id, 'youtube_channels', youtube_channels)
-            return True
+            success = await self.set_guild_config(guild_id, 'youtube_channels', youtube_channels)
+            if success:
+                print(f"✅ Canal adicionado: {channel_id} ({channel_name})")
+            return success
             
         except Exception as e:
             print(f"❌ Erro ao adicionar canal YouTube: {e}")
@@ -146,7 +210,11 @@ class YouTubeSystem(commands.Cog):
             youtube_channels = config.get('youtube_channels', [])
             
             # Remove o canal
+            initial_count = len(youtube_channels)
             youtube_channels = [ch for ch in youtube_channels if ch['channel_id'] != channel_id]
+            
+            if len(youtube_channels) == initial_count:
+                return False  # Canal não foi encontrado
             
             await self.set_guild_config(guild_id, 'youtube_channels', youtube_channels)
             return True
@@ -155,66 +223,14 @@ class YouTubeSystem(commands.Cog):
             print(f"❌ Erro ao remover canal YouTube: {e}")
             return False
 
-    def extract_channel_id(self, url):
-        """Extrai o ID do canal do YouTube da URL"""
-        patterns = [
-            r'youtube\.com/channel/([a-zA-Z0-9_-]+)',
-            r'youtube\.com/c/([a-zA-Z0-9_-]+)',
-            r'youtube\.com/user/([a-zA-Z0-9_-]+)',
-            r'youtube\.com/@([a-zA-Z0-9_.-]+)',
-            r'youtu\.be/channel/([a-zA-Z0-9_-]+)'
-        ]
-        
-        for pattern in patterns:
-            match = re.search(pattern, url)
-            if match:
-                return match.group(1)
-        return None
-
-    async def resolve_channel_id(self, channel_identifier):
-        """Resolve handle/username para channel ID real"""
-        try:
-            # Se já é um channel ID (começa com UC), retorna
-            if channel_identifier.startswith('UC'):
-                return channel_identifier
-                
-            # Tenta diferentes URLs de RSS feed
-            urls_to_try = [
-                f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_identifier}",
-                f"https://www.youtube.com/feeds/videos.xml?user={channel_identifier}"
-            ]
-            
-            async with aiohttp.ClientSession() as session:
-                for url in urls_to_try:
-                    try:
-                        async with session.get(url, timeout=10) as response:
-                            if response.status == 200:
-                                content = await response.text()
-                                feed = feedparser.parse(content)
-                                if feed.entries:
-                                    return channel_identifier
-                    except:
-                        continue
-                        
-            return None
-            
-        except Exception as e:
-            print(f"❌ Erro ao resolver channel ID: {e}")
-            return None
-
     async def get_channel_rss_feed(self, channel_id):
         """Obtém o feed RSS do canal do YouTube"""
         try:
             # Tenta diferentes formatos de URL
-            urls_to_try = []
-            
-            if channel_id.startswith('UC'):
-                urls_to_try.append(f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}")
-            else:
-                urls_to_try.extend([
-                    f"https://www.youtube.com/feeds/videos.xml?user={channel_id}",
-                    f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
-                ])
+            urls_to_try = [
+                f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}",
+                f"https://www.youtube.com/feeds/videos.xml?user={channel_id}"
+            ]
             
             async with aiohttp.ClientSession() as session:
                 for rss_url in urls_to_try:
@@ -346,7 +362,7 @@ class YouTubeSystem(commands.Cog):
         else:
             embed = discord.Embed(
                 title="❌ Erro",
-                description="Não foi possível remover o canal. Verifique se a URL está correta.",
+                description="Não foi possível remover o canal. Verifique se a URL está correta ou se o canal existe na lista.",
                 color=discord.Color.red()
             )
         
@@ -403,7 +419,8 @@ class YouTubeSystem(commands.Cog):
             for i, channel in enumerate(youtube_channels, 1):
                 discord_channel = self.bot.get_channel(channel['discord_channel_id'])
                 channel_mention = discord_channel.mention if discord_channel else "Canal não encontrado"
-                channels_text.append(f"**{i}.** {channel['channel_url']}\n📍 {channel_mention}")
+                channel_name = channel.get('channel_name', 'Nome não encontrado')
+                channels_text.append(f"**{i}.** {channel_name}\n🔗 {channel['channel_url']}\n📍 {channel_mention}")
             
             embed.add_field(
                 name="📺 Canais Monitorados",
@@ -433,27 +450,40 @@ class YouTubeSystem(commands.Cog):
         formatted = formatted.replace('{url}', video_url)
         return formatted
 
-    @tasks.loop(minutes=10)  # Aumentado para 10 minutos para evitar rate limits
+    @tasks.loop(minutes=10)  # Verificação a cada 10 minutos
     async def check_new_videos(self):
         """Verifica novos vídeos nos canais monitorados"""
         if not self._connection_ready:
+            print("⚠️ Conexão com MongoDB não está pronta")
             return
 
         try:
+            print("🔍 Iniciando verificação de novos vídeos...")
+            
             # Busca todas as configurações de guilds
+            guild_count = 0
             async for guild_doc in self.collection.find({}):
                 guild_id = guild_doc['guild_id']
                 config = guild_doc.get('config', {})
                 youtube_channels = config.get('youtube_channels', [])
                 youtube_message = config.get('youtube_message')
 
-                if not youtube_channels or not youtube_message:
+                if not youtube_channels:
                     continue
+                    
+                if not youtube_message:
+                    print(f"⚠️ Guild {guild_id} não tem mensagem configurada")
+                    continue
+
+                guild_count += 1
+                print(f"🔍 Verificando {len(youtube_channels)} canais para guild {guild_id}")
 
                 for channel_config in youtube_channels:
                     await self.check_channel_for_new_videos(guild_id, channel_config, youtube_message)
                     # Pequena pausa entre verificações para evitar rate limits
                     await asyncio.sleep(2)
+
+            print(f"✅ Verificação concluída para {guild_count} guilds")
 
         except Exception as e:
             print(f"❌ Erro na verificação de vídeos: {e}")
@@ -464,6 +494,9 @@ class YouTubeSystem(commands.Cog):
             channel_id = channel_config['channel_id']
             discord_channel_id = channel_config['discord_channel_id']
             last_video_id = channel_config.get('last_video_id')
+            channel_name = channel_config.get('channel_name', 'Canal desconhecido')
+
+            print(f"🔍 Verificando canal {channel_name} ({channel_id})")
 
             # Busca feed RSS
             feed = await self.get_channel_rss_feed(channel_id)
@@ -491,6 +524,8 @@ class YouTubeSystem(commands.Cog):
                 print(f"⚠️ Não foi possível extrair ID do vídeo para canal {channel_id}")
                 return
 
+            print(f"📺 Último vídeo: {video_id} | Salvo anteriormente: {last_video_id}")
+
             # Se é um novo vídeo
             if video_id != last_video_id:
                 # Atualiza o último vídeo ID
@@ -501,11 +536,13 @@ class YouTubeSystem(commands.Cog):
                     await self.send_video_notification(
                         discord_channel_id,
                         latest_video.title,
-                        feed.feed.title,
+                        channel_name,
                         latest_video.link,
                         youtube_message
                     )
-                    print(f"📺 Novo vídeo detectado para canal {channel_id}: {latest_video.title}")
+                    print(f"📺 Novo vídeo detectado para canal {channel_name}: {latest_video.title}")
+                else:
+                    print(f"🔄 Primeira verificação para canal {channel_name} - não enviando notificação")
 
         except Exception as e:
             print(f"❌ Erro ao verificar canal {channel_config.get('channel_id', 'unknown')}: {e}")
@@ -513,7 +550,7 @@ class YouTubeSystem(commands.Cog):
     async def update_last_video_id(self, guild_id, channel_id, video_id):
         """Atualiza o ID do último vídeo verificado"""
         try:
-            await self.collection.update_one(
+            result = await self.collection.update_one(
                 {
                     "guild_id": str(guild_id),
                     "config.youtube_channels.channel_id": channel_id
@@ -524,6 +561,12 @@ class YouTubeSystem(commands.Cog):
                     }
                 }
             )
+            
+            if result.modified_count > 0:
+                print(f"✅ Último vídeo ID atualizado para {channel_id}: {video_id}")
+            else:
+                print(f"⚠️ Nenhum documento foi modificado ao atualizar vídeo ID para {channel_id}")
+                
         except Exception as e:
             print(f"❌ Erro ao atualizar último vídeo ID: {e}")
 
@@ -561,6 +604,8 @@ class YouTubeSystem(commands.Cog):
     async def before_check_videos(self):
         """Aguarda o bot estar pronto antes de iniciar o loop"""
         await self.bot.wait_until_ready()
+        # Aguarda mais um pouco para garantir que a conexão está estabelecida
+        await asyncio.sleep(10)
         print("🔄 Sistema YouTube iniciado - verificação a cada 10 minutos")
 
     @check_new_videos.error
@@ -612,9 +657,35 @@ class YouTubeSystem(commands.Cog):
         embed.set_footer(text="Todos os comandos requerem permissão de Administrador • Verificação automática a cada 10 minutos")
         await ctx.send(embed=embed)
 
+    @commands.command(name='testyt')
+    @commands.has_permissions(administrator=True)
+    async def test_youtube(self, ctx):
+        """Comando para testar o sistema YouTube"""
+        if not await self.check_config_channel(ctx):
+            return
+            
+        embed = discord.Embed(
+            title="🧪 Teste do Sistema YouTube",
+            description="Executando verificação manual...",
+            color=discord.Color.orange()
+        )
+        msg = await ctx.send(embed=embed)
+        
+        # Executa uma verificação manual
+        if self._connection_ready:
+            await self.check_new_videos()
+            embed.description = "✅ Verificação manual concluída! Veja os logs do console para detalhes."
+            embed.color = discord.Color.green()
+        else:
+            embed.description = "❌ Conexão com MongoDB não está disponível."
+            embed.color = discord.Color.red()
+            
+        await msg.edit(embed=embed)
+
     async def cog_unload(self):
         """Para o loop e fecha a conexão quando o cog é descarregado"""
-        self.check_new_videos.cancel()
+        if self.check_new_videos.is_running():
+            self.check_new_videos.cancel()
         if self.client:
             self.client.close()
             print("🔌 Conexão YouTube com MongoDB fechada")
