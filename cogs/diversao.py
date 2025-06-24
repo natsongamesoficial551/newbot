@@ -4,22 +4,44 @@ import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import random
-import logging
+import json
+from datetime import datetime, timedelta
+import aiohttp
 
-class Diversao(commands.Cog):
+class FunSystem(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.client = None
         self.db = None
         self.collection = None
         self._connection_ready = False
-        
-        # Configura logging para debug
-        logging.basicConfig(level=logging.INFO)
-        self.logger = logging.getLogger(__name__)
-        
         # Inicializa a conexão com MongoDB
-        asyncio.create_task(self.init_database())
+        self.bot.loop.create_task(self.init_database())
+        
+        # Listas para comandos de diversão
+        self.piadas = [
+            "Por que os passarinhos voam para o sul? Porque é muito longe para ir andando! 🐦",
+            "O que a impressora falou para a outra impressora? Essa folha é sua ou é impressão minha? 🖨️",
+            "Por que o livro de matemática estava triste? Porque tinha muitos problemas! 📚",
+            "O que o pato disse para a pata? Vem quá! 🦆",
+            "Por que os peixes não jogam tênis? Porque eles têm medo da rede! 🐟"
+        ]
+        
+        self.frases_motivacionais = [
+            "Você é mais forte do que imagina! 💪",
+            "Cada dia é uma nova oportunidade! ✨",
+            "Acredite em você mesmo! 🌟",
+            "O sucesso é a soma de pequenos esforços! 🎯",
+            "Seja a mudança que você quer ver no mundo! 🌍"
+        ]
+        
+        self.curiosidades = [
+            "Os polvos têm três corações! 🐙",
+            "Uma barata pode viver por semanas sem cabeça! 🪳",
+            "Os golfinhos têm nomes para uns aos outros! 🐬",
+            "O coração de uma baleia azul é do tamanho de um carro! 🐋",
+            "As abelhas podem reconhecer rostos humanos! 🐝"
+        ]
 
     async def init_database(self):
         """Inicializa a conexão com MongoDB"""
@@ -27,25 +49,22 @@ class Diversao(commands.Cog):
             mongo_uri = os.getenv("MONGO_URI")
             
             if not mongo_uri:
-                self.logger.warning("❌ MONGO_URI não encontrada nas variáveis de ambiente!")
-                # Continua sem MongoDB se não estiver configurado
-                self._connection_ready = False
+                print("❌ MONGO_URI não encontrada nas variáveis de ambiente!")
                 return
             
-            self.logger.info("🔄 Conectando ao MongoDB (Diversão)...")
+            print("🔄 Conectando ao MongoDB (Fun System)...")
             self.client = AsyncIOMotorClient(mongo_uri)
             
-            # Testa a conexão
             await self.client.admin.command('ping')
             
             self.db = self.client['discord_bot']
-            self.collection = self.db['diversao_data']
+            self.collection = self.db['fun_config']
             self._connection_ready = True
             
-            self.logger.info("✅ Conectado ao MongoDB (Diversão) com sucesso!")
+            print("✅ Fun System conectado ao MongoDB!")
             
         except Exception as e:
-            self.logger.error(f"❌ Erro ao conectar com MongoDB (Diversão): {e}")
+            print(f"❌ Erro ao conectar com MongoDB (Fun): {e}")
             self._connection_ready = False
 
     async def ensure_connection(self):
@@ -54,563 +73,465 @@ class Diversao(commands.Cog):
             await self.init_database()
         return self._connection_ready
 
-    # ============ LISTENER PARA DEBUG ============
-    @commands.Cog.listener()
-    async def on_ready(self):
-        self.logger.info(f"🎮 Cog Diversao carregado! Bot: {self.bot.user}")
-
-    @commands.Cog.listener()
-    async def on_command_error(self, ctx, error):
-        """Captura erros de comandos para debug"""
-        if isinstance(error, commands.CommandNotFound):
-            return  # Ignora comandos não encontrados
-        
-        self.logger.error(f"Erro no comando {ctx.command}: {error}")
-        
-        # Envia erro para o usuário apenas se for um erro específico
-        if isinstance(error, commands.MissingRequiredArgument):
-            await ctx.send(f"❌ Argumento obrigatório faltando: `{error.param.name}`")
-        elif isinstance(error, commands.BadArgument):
-            await ctx.send(f"❌ Argumento inválido: {error}")
-
-    # ============ COMANDOS DE EVENTO ============
-    @commands.group(invoke_without_command=True, aliases=["evento"])
-    async def evento(self, ctx):
-        """Comandos do evento de reações"""
-        embed = discord.Embed(
-            title="🎉 Evento de Reações",
-            description="**Comandos disponíveis:**\n• `!evento entrar` - Entrar no evento\n• `!evento stats` - Ver estatísticas\n• `!evento inventario` - Ver inventário\n• `!evento rank` - Ver ranking\n• `!evento sair` - Sair do evento",
-            color=discord.Color.blue()
-        )
-        embed.set_footer(text=f"Solicitado por {ctx.author.display_name}")
-        await ctx.send(embed=embed)
-
-    @evento.command(name="entrar")
-    async def evento_entrar(self, ctx):
-        """Entrar no evento de reações"""
-        embed = discord.Embed(
-            title="✅ Evento Entrar",
-            description=f"{ctx.author.mention}, você entrou no Evento de Reações!",
-            color=discord.Color.green()
-        )
-        embed.set_footer(text="Boa sorte no evento!")
-        await ctx.send(embed=embed)
-
-    @evento.command(name="stats")
-    async def evento_stats(self, ctx):
-        """Ver estatísticas do evento"""
-        embed = discord.Embed(
-            title="📊 Estatísticas do Evento",
-            description=f"**{ctx.author.display_name}**\n🎁 Presentes coletados: 0\n⭐ Pontos: 0\n🏆 Posição: #1",
-            color=discord.Color.orange()
-        )
-        embed.set_footer(text="Continue participando para subir no ranking!")
-        await ctx.send(embed=embed)
-
-    @evento.command(name="inventario", aliases=["inventário"])
-    async def evento_inventario(self, ctx):
-        """Ver inventário do evento"""
-        embed = discord.Embed(
-            title="🎒 Inventário do Evento",
-            description="Seu inventário está vazio. Participe do evento para coletar itens!",
-            color=discord.Color.purple()
-        )
-        embed.set_footer(text="Colete presentes reagindo às mensagens!")
-        await ctx.send(embed=embed)
-
-    @evento.command(name="rank")
-    async def evento_rank(self, ctx):
-        """Ver ranking do evento"""
-        embed = discord.Embed(
-            title="🏆 Ranking do Evento",
-            description="**Top 10 coletores de presentes:**\n1. Ninguém ainda\n2. Seja o primeiro!\n3. ...",
-            color=discord.Color.gold()
-        )
-        embed.set_footer(text="Participe para aparecer no ranking!")
-        await ctx.send(embed=embed)
-
-    @evento.command(name="sair")
-    async def evento_sair(self, ctx):
-        """Sair do evento de reações"""
-        embed = discord.Embed(
-            title="❌ Evento Sair",
-            description=f"{ctx.author.mention}, você saiu do Evento de Reações.",
-            color=discord.Color.red()
-        )
-        embed.set_footer(text="Você pode entrar novamente a qualquer momento!")
-        await ctx.send(embed=embed)
-
-    # ============ COMANDOS DE JOGOS ============
-    @commands.command(aliases=["dançascadeiras"])
-    async def dancadascadeiras(self, ctx):
-        """Iniciar dança das cadeiras"""
-        embed = discord.Embed(
-            title="💃 Dança das Cadeiras",
-            description="🎵 Vamos brincar de Dança das Cadeiras! A música começou!",
-            color=discord.Color.magenta()
-        )
-        embed.set_footer(text="Quando a música parar, sente-se rapidamente!")
-        await ctx.send(embed=embed)
-
-    @commands.command(aliases=["shippar"])
-    async def ship(self, ctx, member1: discord.Member = None, member2: discord.Member = None):
-        """Shippar dois membros"""
-        if member1 is None or member2 is None:
-            embed = discord.Embed(
-                title="💕 Ship",
-                description="Você precisa mencionar **dois membros** para shippar!\nExemplo: `!ship @pessoa1 @pessoa2`",
-                color=discord.Color.red()
-            )
-        else:
-            compatibility = random.randint(0, 100)
+    async def get_user_data(self, user_id, guild_id):
+        """Obtém dados do usuário do MongoDB"""
+        try:
+            if not await self.ensure_connection():
+                return {}
+                
+            data = await self.collection.find_one({
+                "user_id": str(user_id),
+                "guild_id": str(guild_id)
+            })
+            return data.get('data', {}) if data else {}
             
-            if compatibility >= 80:
-                hearts = "💖💖💖"
-                message = "Casal perfeito!"
-            elif compatibility >= 60:
-                hearts = "💝💝"
-                message = "Boa combinação!"
-            elif compatibility >= 40:
-                hearts = "💛"
-                message = "Talvez dê certo..."
-            else:
-                hearts = "💔"
-                message = "Melhor como amigos!"
-            
-            embed = discord.Embed(
-                title="💕 Ship Result",
-                description=f"{hearts} **{member1.display_name}** x **{member2.display_name}**\n\n**Compatibilidade: {compatibility}%**\n{message}",
-                color=discord.Color.pink()
-            )
-        
-        await ctx.send(embed=embed)
+        except Exception as e:
+            print(f"❌ Erro ao buscar dados do usuário: {e}")
+            return {}
 
-    @commands.command(aliases=["dice", "dado"])
-    async def rolar(self, ctx, dados: int = 1, lados: int = 6):
-        """Rolar dados"""
-        # Limita valores para evitar spam
-        dados = min(max(1, dados), 10)
-        lados = min(max(2, lados), 100)
-        
-        results = [random.randint(1, lados) for _ in range(dados)]
-        total = sum(results)
+    async def update_user_data(self, user_id, guild_id, key, value):
+        """Atualiza dados do usuário no MongoDB"""
+        try:
+            if not await self.ensure_connection():
+                return False
+            
+            await self.collection.update_one(
+                {"user_id": str(user_id), "guild_id": str(guild_id)},
+                {"$set": {f"data.{key}": value}},
+                upsert=True
+            )
+            return True
+                
+        except Exception as e:
+            print(f"❌ Erro ao atualizar dados: {e}")
+            return False
+
+    @commands.command(name='piada')
+    async def piada(self, ctx):
+        """Conta uma piada aleatória"""
+        piada = random.choice(self.piadas)
         
         embed = discord.Embed(
-            title="🎲 Rolar Dados",
-            description=f"**{dados}d{lados}**\n\n🎯 Resultados: {', '.join(map(str, results))}\n📊 Total: **{total}**",
-            color=discord.Color.dark_blue()
-        )
-        embed.set_footer(text=f"Rolado por {ctx.author.display_name}")
-        await ctx.send(embed=embed)
-
-    @commands.command(aliases=["flipcoin", "caracoroa"])
-    async def girarmoeda(self, ctx):
-        """Girar uma moeda"""
-        result = random.choice(["Cara", "Coroa"])
-        emoji = "🟡" if result == "Cara" else "⚪"
-        embed = discord.Embed(
-            title="🪙 Girar Moeda",
-            description=f"{emoji} **{result}**!",
-            color=discord.Color.gold()
-        )
-        embed.set_footer(text=f"Moeda girada por {ctx.author.display_name}")
-        await ctx.send(embed=embed)
-
-    @commands.command()
-    async def vieirinha(self, ctx, *, pergunta: str = None):
-        """Fazer uma pergunta para a Vieirinha (8-ball)"""
-        if not pergunta:
-            embed = discord.Embed(
-                title="🔮 Vieirinha",
-                description="Faça uma pergunta para a Vieirinha!\nExemplo: `!vieirinha Vai chover hoje?`",
-                color=discord.Color.blue()
-            )
-        else:
-            responses = [
-                "Sim, com certeza!", "Não, de jeito nenhum.", "Talvez...", 
-                "É muito provável.", "Não conte com isso.", "Definitivamente sim!",
-                "Melhor não te falar agora.", "Não posso prever isso.", "Claro que sim!",
-                "As estrelas dizem que não.", "Pode apostar!", "Nem sonhando!",
-                "É possível.", "Pergunta difícil...", "Absolutamente!"
-            ]
-            answer = random.choice(responses)
-            embed = discord.Embed(
-                title="🔮 Resposta da Vieirinha",
-                description=f"**Pergunta:** {pergunta}\n\n**Resposta:** {answer}",
-                color=discord.Color.purple()
-            )
-            embed.set_footer(text="A Vieirinha nunca erra... ou quase nunca 😉")
-        
-        await ctx.send(embed=embed)
-
-    @commands.command(aliases=["hg"])
-    async def jogosvorazes(self, ctx, *participantes: discord.Member):
-        """Simular Jogos Vorazes"""
-        if len(participantes) < 2:
-            embed = discord.Embed(
-                title="⚔️ Jogos Vorazes",
-                description="Mencione pelo menos **2 participantes** para simular os Jogos Vorazes!\nExemplo: `!jogosvorazes @pessoa1 @pessoa2 @pessoa3`",
-                color=discord.Color.red()
-            )
-        else:
-            vencedor = random.choice(participantes)
-            participantes_nomes = [p.display_name for p in participantes]
-            
-            embed = discord.Embed(
-                title="⚔️ Jogos Vorazes",
-                description=f"**Participantes:** {', '.join(participantes_nomes)}\n\n🏆 **Vencedor:** {vencedor.mention}\n\n*Que os jogos comecem!*",
-                color=discord.Color.dark_red()
-            )
-            embed.set_footer(text="May the odds be ever in your favor!")
-        
-        await ctx.send(embed=embed)
-
-    @commands.command(aliases=["pedrapapeltesoura", "ppt"])
-    async def jankenpon(self, ctx, escolha: str = None):
-        """Jogar pedra, papel, tesoura"""
-        opcoes = ["pedra", "papel", "tesoura"]
-        emojis = {"pedra": "🗿", "papel": "📄", "tesoura": "✂️"}
-        
-        if escolha is None or escolha.lower() not in opcoes:
-            embed = discord.Embed(
-                title="✂️ Jankenpon",
-                description="Escolha: **pedra**, **papel** ou **tesoura**\nExemplo: `!jankenpon pedra`",
-                color=discord.Color.greyple()
-            )
-        else:
-            escolha_user = escolha.lower()
-            escolha_bot = random.choice(opcoes)
-            
-            # Determina o resultado
-            if escolha_user == escolha_bot:
-                resultado = "Empate!"
-                cor = discord.Color.yellow()
-            elif (escolha_user == "pedra" and escolha_bot == "tesoura") or \
-                 (escolha_user == "papel" and escolha_bot == "pedra") or \
-                 (escolha_user == "tesoura" and escolha_bot == "papel"):
-                resultado = "Você ganhou! 🎉"
-                cor = discord.Color.green()
-            else:
-                resultado = "Você perdeu! 😢"
-                cor = discord.Color.red()
-            
-            embed = discord.Embed(
-                title="✂️ Jankenpon",
-                description=f"Você: {emojis[escolha_user]} **{escolha_user.title()}**\nBot: {emojis[escolha_bot]} **{escolha_bot.title()}**\n\n**{resultado}**",
-                color=cor
-            )
-            embed.set_footer(text="Boa partida!")
-        
-        await ctx.send(embed=embed)
-
-    # ============ COMANDOS DE AVALIAÇÃO ============
-    @commands.command(aliases=["ratewaifu", "avaliarwaifu"])
-    async def avaliar_waifu(self, ctx, *, waifu: str = None):
-        """Avaliar uma waifu"""
-        if not waifu:
-            embed = discord.Embed(
-                title="💖 Avaliar Waifu",
-                description="Forneça o nome da waifu para avaliarmos!\nExemplo: `!avaliar_waifu Zero Two`",
-                color=discord.Color.red()
-            )
-        else:
-            nota = random.randint(1, 10)
-            stars = "⭐" * nota + "☆" * (10 - nota)
-            
-            # Comentários baseados na nota
-            if nota >= 9:
-                comentario = "Waifu perfeita! 💕"
-            elif nota >= 7:
-                comentario = "Excelente escolha!"
-            elif nota >= 5:
-                comentario = "Uma boa waifu!"
-            else:
-                comentario = "Hmm... questionável 🤔"
-            
-            embed = discord.Embed(
-                title="💖 Avaliar Waifu",
-                description=f"**{waifu}**\n\n{stars}\n**Nota: {nota}/10**\n\n{comentario}",
-                color=discord.Color.pink()
-            )
-            embed.set_footer(text=f"Avaliação solicitada por {ctx.author.display_name}")
-        
-        await ctx.send(embed=embed)
-
-    @commands.command(aliases=["ratehusbando", "avaliarhusbando"])
-    async def avaliar_husbando(self, ctx, *, husbando: str = None):
-        """Avaliar um husbando"""
-        if not husbando:
-            embed = discord.Embed(
-                title="💙 Avaliar Husbando",
-                description="Forneça o nome do husbando para avaliarmos!\nExemplo: `!avaliar_husbando Levi`",
-                color=discord.Color.red()
-            )
-        else:
-            nota = random.randint(1, 10)
-            stars = "⭐" * nota + "☆" * (10 - nota)
-            
-            # Comentários baseados na nota
-            if nota >= 9:
-                comentario = "Husbando perfeito! 💙"
-            elif nota >= 7:
-                comentario = "Excelente escolha!"
-            elif nota >= 5:
-                comentario = "Um bom husbando!"
-            else:
-                comentario = "Hmm... questionável 🤔"
-            
-            embed = discord.Embed(
-                title="💙 Avaliar Husbando",
-                description=f"**{husbando}**\n\n{stars}\n**Nota: {nota}/10**\n\n{comentario}",
-                color=discord.Color.blue()
-            )
-            embed.set_footer(text=f"Avaliação solicitada por {ctx.author.display_name}")
-        
-        await ctx.send(embed=embed)
-
-    # ============ COMANDOS DE TEXTO ============
-    def vaporwave_text(self, text: str) -> str:
-        """Converte texto para estilo vaporwave"""
-        return ''.join(chr(0xFF01 + (ord(c) - 33)) if 33 <= ord(c) <= 126 else c for c in text)
-
-    @commands.command()
-    async def vaporwave(self, ctx, *, message: str):
-        """Converter texto para estilo vaporwave"""
-        transformed = self.vaporwave_text(message)
-        embed = discord.Embed(
-            title="🌊 Texto Vaporwave",
-            description=transformed,
-            color=discord.Color.purple()
-        )
-        embed.set_footer(text="ａｅｓｔｈｅｔｉｃ")
-        await ctx.send(embed=embed)
-
-    @commands.command()
-    async def maiusculo(self, ctx, *, message: str):
-        """Converter texto para maiúsculo"""
-        embed = discord.Embed(
-            title="🔤 Texto Maiúsculo",
-            description=message.upper(),
-            color=discord.Color.blue()
-        )
-        await ctx.send(embed=embed)
-
-    @commands.command()
-    async def minusculo(self, ctx, *, message: str):
-        """Converter texto para minúsculo"""
-        embed = discord.Embed(
-            title="🔡 Texto Minúsculo",
-            description=message.lower(),
-            color=discord.Color.blue()
-        )
-        await ctx.send(embed=embed)
-
-    @commands.command()
-    async def zombar(self, ctx, *, message: str):
-        """Texto em formato mocking/zombaria"""
-        transformed = ''.join(c.upper() if random.random() > 0.5 else c.lower() for c in message)
-        embed = discord.Embed(
-            title="🤡 Texto Zombar",
-            description=transformed,
-            color=discord.Color.dark_purple()
-        )
-        embed.set_footer(text="mOcKiNg TeXt")
-        await ctx.send(embed=embed)
-
-    @commands.command()
-    async def palmas(self, ctx, *, message: str):
-        """Separar palavras com palmas"""
-        transformed = "👏".join(message.split())
-        embed = discord.Embed(
-            title="👏 Texto Palmas",
-            description=transformed,
-            color=discord.Color.gold()
-        )
-        await ctx.send(embed=embed)
-
-    # ============ COMANDOS DE INVOCAÇÃO ============
-    @commands.command(aliases=["tiodopave", "piada"])
-    async def invocar_tiodopave(self, ctx):
-        """Invocar o tio do pavê"""
-        piadas = [
-            "É pavê ou pacumê? 🥧",
-            "Qual é o cúmulo da sorte? Encontrar um fósforo em cima de uma caixa de fósforos! 📦",
-            "Por que o pássaro foi ao médico? Porque ele estava com a asa quebrada! 🐦",
-            "O que é que a impressora falou para a outra impressora? Essa folha é sua ou é impressão minha? 🖨️",
-            "Por que os pássaros voam para o sul no inverno? Porque é longe demais para ir andando! 🐧",
-            "O que é que o pato disse para a pata? Vem quá! 🦆"
-        ]
-        piada = random.choice(piadas)
-        embed = discord.Embed(
-            title="👨‍🦳 Tio do Pavê Invocado",
+            title="😂 Piada do Dia",
             description=piada,
-            color=discord.Color.green()
+            color=discord.Color.gold()
         )
-        embed.set_footer(text="Ba dum tss! 🥁")
+        embed.set_footer(text=f"Pedido por {ctx.author.display_name}")
+        
         await ctx.send(embed=embed)
 
-    @commands.command(aliases=["faustao"])
-    async def invocar_faustao(self, ctx):
-        """Invocar o Faustão"""
-        frases = [
-            "Êêêê... Macarrão! 🍝",
-            "Você quer dinheiro? 💰",
-            "Oloco, meu! 😱",
-            "Errou! 🚫",
-            "Pegadinha do malandro! 😂",
-            "Quero dinheiro! Quero dinheiro! 💸"
-        ]
-        frase = random.choice(frases)
+    @commands.command(name='motivar')
+    async def motivar(self, ctx, member: discord.Member = None):
+        """Envia uma frase motivacional"""
+        target = member or ctx.author
+        frase = random.choice(self.frases_motivacionais)
+        
         embed = discord.Embed(
-            title="📺 Faustão Invocado",
-            description=f"**{frase}**\n\nO amado Faustão chegou ao seu servidor!",
-            color=discord.Color.orange()
+            title="🌟 Motivação",
+            description=f"{target.mention}, {frase}",
+            color=discord.Color.purple()
         )
-        embed.set_footer(text="Domingão do Faustão!")
+        embed.set_thumbnail(url=target.display_avatar.url)
+        
         await ctx.send(embed=embed)
 
-    @commands.command(aliases=["kenji"])
-    async def invocar_kenji(self, ctx):
-        """Invocar o Kenji"""
-        frases = [
-            "Hai minasan genki deska! 👋",
-            "Sugoi! ✨",
-            "Arigatou gozaimasu! 🙏",
-            "Konnichiwa! ☀️",
-            "Kawaii desu ne! 😊"
-        ]
-        frase = random.choice(frases)
+    @commands.command(name='curiosidade')
+    async def curiosidade(self, ctx):
+        """Compartilha uma curiosidade interessante"""
+        curiosidade = random.choice(self.curiosidades)
+        
         embed = discord.Embed(
-            title="🎌 Kenji Invocado",
-            description=f"**{frase}**\n\nKenji chegou direto do Loop Infinito!",
+            title="🤔 Você Sabia?",
+            description=curiosidade,
             color=discord.Color.teal()
         )
-        embed.set_footer(text="Arigato!")
+        
         await ctx.send(embed=embed)
 
-    # ============ COMANDOS DE MEME ============
-    @commands.command()
-    async def cancelar(self, ctx, member: discord.Member = None):
-        """Cancelar alguém"""
-        if member:
-            target = member.display_name
-        else:
-            target = "alguém aleatório"
+    @commands.command(name='dado')
+    async def dado(self, ctx, lados: int = 6):
+        """Rola um dado com número especificado de lados"""
+        if lados < 2 or lados > 100:
+            embed = discord.Embed(
+                title="❌ Erro",
+                description="O dado deve ter entre 2 e 100 lados!",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed)
+            return
+        
+        resultado = random.randint(1, lados)
         
         embed = discord.Embed(
-            title="🚫 CANCELADO",
-            description=f"**{target}** foi cancelado pela cultura de cancelamento do Twitter!",
-            color=discord.Color.red()
-        )
-        embed.set_footer(text="#Cancelado")
-        await ctx.send(embed=embed)
-
-    @commands.command()
-    async def tristerealidade(self, ctx):
-        """Triste realidade"""
-        realidades = [
-            "A triste realidade é que todos nós vamos morrer um dia... mas pelo menos temos memes! 😔",
-            "A triste realidade é que o fim de semana acaba muito rápido... 📅",
-            "A triste realidade é que o dinheiro não dá em árvore... 💸",
-            "A triste realidade é que não podemos comer pizza todos os dias sem consequências... 🍕"
-        ]
-        realidade = random.choice(realidades)
-        embed = discord.Embed(
-            title="😔 Triste Realidade",
-            description=realidade,
-            color=discord.Color.dark_gray()
-        )
-        await ctx.send(embed=embed)
-
-    @commands.command()
-    async def todogrupotem(self, ctx):
-        """Todo grupo tem..."""
-        tipos = [
-            "👑 O líder", "🤡 O palhaço", "😴 O que sempre dorme",
-            "📱 O viciado no celular", "🍕 O que sempre tem fome",
-            "💰 O rico", "😭 O dramático", "🧠 O inteligente",
-            "🎮 O gamer", "📚 O nerd", "🎵 O que só fala de música",
-            "📷 O que posta foto de tudo", "⏰ O que sempre se atrasa"
-        ]
-        
-        embed = discord.Embed(
-            title="👥 Todo Grupo Tem",
-            description="**Todo grupo tem:**\n" + "\n".join(tipos),
-            color=discord.Color.dark_orange()
-        )
-        embed.set_footer(text="Qual é você no seu grupo? 🤔")
-        await ctx.send(embed=embed)
-
-    # ============ COMANDO DE TESTE ============
-    @commands.command()
-    async def testediversao(self, ctx):
-        """Comando de teste para verificar se o cog está funcionando"""
-        embed = discord.Embed(
-            title="✅ Teste de Diversão",
-            description="O cog de Diversão está funcionando perfeitamente!",
-            color=discord.Color.green()
-        )
-        embed.add_field(name="Status", value="🟢 Online", inline=True)
-        embed.add_field(name="MongoDB", value="🟢 Conectado" if self._connection_ready else "🔴 Desconectado", inline=True)
-        embed.add_field(name="Comandos", value="🟢 Carregados", inline=True)
-        embed.set_footer(text=f"Testado por {ctx.author.display_name}")
-        await ctx.send(embed=embed)
-
-    # ============ COMANDO DE AJUDA ============
-    @commands.command(name='helpdiversao')
-    async def help_diversao(self, ctx):
-        """Ajuda do sistema de diversão"""
-        embed = discord.Embed(
-            title="🎮 Sistema de Diversão - Ajuda",
-            description="Lista de comandos disponíveis:",
+            title="🎲 Resultado do Dado",
+            description=f"Dado de {lados} lados: **{resultado}**",
             color=discord.Color.blue()
         )
+        embed.set_footer(text=f"Jogado por {ctx.author.display_name}")
+        
+        await ctx.send(embed=embed)
+
+    @commands.command(name='moeda')
+    async def moeda(self, ctx):
+        """Joga uma moeda"""
+        resultado = random.choice(["Cara", "Coroa"])
+        emoji = "🟡" if resultado == "Cara" else "⚪"
+        
+        embed = discord.Embed(
+            title="🪙 Cara ou Coroa",
+            description=f"{emoji} **{resultado}**!",
+            color=discord.Color.orange()
+        )
+        
+        await ctx.send(embed=embed)
+
+    @commands.command(name='8ball')
+    async def eight_ball(self, ctx, *, pergunta):
+        """Faz uma pergunta para a bola 8"""
+        respostas = [
+            "Sim, definitivamente!", "É certo!", "Sem dúvida!",
+            "Sim, sem dúvida!", "Você pode contar com isso!",
+            "Como eu vejo, sim!", "Provavelmente sim!",
+            "Perspectiva boa!", "Sim!", "Os sinais apontam que sim!",
+            "Resposta nebulosa, tente novamente!", "Pergunte novamente mais tarde!",
+            "Melhor não te dizer agora!", "Não é possível prever agora!",
+            "Concentre-se e pergunte novamente!", "Não conte com isso!",
+            "Minha resposta é não!", "Minhas fontes dizem não!",
+            "Perspectiva não muito boa!", "Muito duvidoso!"
+        ]
+        
+        resposta = random.choice(respostas)
+        
+        embed = discord.Embed(
+            title="🎱 Bola 8 Mágica",
+            color=discord.Color.dark_blue()
+        )
+        embed.add_field(name="Pergunta:", value=pergunta, inline=False)
+        embed.add_field(name="Resposta:", value=resposta, inline=False)
+        embed.set_footer(text=f"Perguntado por {ctx.author.display_name}")
+        
+        await ctx.send(embed=embed)
+
+    @commands.command(name='avatar')
+    async def avatar(self, ctx, member: discord.Member = None):
+        """Mostra o avatar de um usuário"""
+        target = member or ctx.author
+        
+        embed = discord.Embed(
+            title=f"🖼️ Avatar de {target.display_name}",
+            color=discord.Color.blurple()
+        )
+        embed.set_image(url=target.display_avatar.url)
+        embed.add_field(
+            name="Link direto:",
+            value=f"[Clique aqui]({target.display_avatar.url})",
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
+
+    @commands.command(name='escolher')
+    async def escolher(self, ctx, *, opcoes):
+        """Escolhe uma opção aleatória entre as fornecidas (separadas por vírgula)"""
+        lista_opcoes = [opcao.strip() for opcao in opcoes.split(',')]
+        
+        if len(lista_opcoes) < 2:
+            embed = discord.Embed(
+                title="❌ Erro",
+                description="Forneça ao menos 2 opções separadas por vírgula!",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed)
+            return
+        
+        escolha = random.choice(lista_opcoes)
+        
+        embed = discord.Embed(
+            title="🎯 Escolha Aleatória",
+            description=f"Eu escolho: **{escolha}**",
+            color=discord.Color.green()
+        )
+        embed.add_field(
+            name="Opções disponíveis:",
+            value=", ".join(lista_opcoes),
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
+
+    @commands.command(name='rps')
+    async def rock_paper_scissors(self, ctx, escolha: str):
+        """Joga pedra, papel ou tesoura"""
+        opcoes = {'pedra': '🪨', 'papel': '📄', 'tesoura': '✂️'}
+        escolha = escolha.lower()
+        
+        if escolha not in opcoes:
+            embed = discord.Embed(
+                title="❌ Opção Inválida",
+                description="Escolha entre: pedra, papel ou tesoura",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed)
+            return
+        
+        bot_escolha = random.choice(list(opcoes.keys()))
+        
+        # Determinar vencedor
+        if escolha == bot_escolha:
+            resultado = "Empate!"
+            cor = discord.Color.orange()
+        elif (escolha == 'pedra' and bot_escolha == 'tesoura') or \
+             (escolha == 'papel' and bot_escolha == 'pedra') or \
+             (escolha == 'tesoura' and bot_escolha == 'papel'):
+            resultado = "Você ganhou!"
+            cor = discord.Color.green()
+        else:
+            resultado = "Eu ganhei!"
+            cor = discord.Color.red()
+        
+        embed = discord.Embed(
+            title="🎮 Pedra, Papel, Tesoura",
+            description=f"**{resultado}**",
+            color=cor
+        )
+        embed.add_field(
+            name="Sua escolha:",
+            value=f"{opcoes[escolha]} {escolha.title()}",
+            inline=True
+        )
+        embed.add_field(
+            name="Minha escolha:",
+            value=f"{opcoes[bot_escolha]} {bot_escolha.title()}",
+            inline=True
+        )
+        
+        await ctx.send(embed=embed)
+
+    @commands.command(name='love')
+    async def love_calculator(self, ctx, pessoa1: discord.Member, pessoa2: discord.Member):
+        """Calcula a compatibilidade amorosa entre duas pessoas"""
+        # Usar IDs para gerar um número "consistente" mas aleatório
+        seed = abs(hash(f"{pessoa1.id}{pessoa2.id}")) % 101
+        
+        if seed < 30:
+            emoji = "💔"
+            descricao = "Talvez não seja o match perfeito..."
+        elif seed < 60:
+            emoji = "💛"
+            descricao = "Há potencial aqui!"
+        elif seed < 80:
+            emoji = "💕"
+            descricao = "Que combinação fofa!"
+        else:
+            emoji = "💖"
+            descricao = "Match perfeito!"
+        
+        embed = discord.Embed(
+            title="💘 Calculadora do Amor",
+            description=f"{pessoa1.mention} + {pessoa2.mention}",
+            color=discord.Color.magenta()
+        )
+        embed.add_field(
+            name="Compatibilidade:",
+            value=f"{emoji} **{seed}%**",
+            inline=False
+        )
+        embed.add_field(
+            name="Veredicto:",
+            value=descricao,
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
+
+    @commands.command(name='rank')
+    async def user_rank(self, ctx, tipo: str = "mensagens"):
+        """Mostra ranking de atividade (mensagens, comandos, etc.)"""
+        if tipo not in ["mensagens", "comandos"]:
+            embed = discord.Embed(
+                title="❌ Tipo Inválido",
+                description="Use: `mensagens` ou `comandos`",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed)
+            return
+        
+        # Simular dados de ranking (em produção, viria do banco)
+        usuarios_exemplo = [
+            {"user": ctx.guild.owner, "count": random.randint(50, 200)},
+            {"user": ctx.author, "count": random.randint(20, 100)},
+        ]
+        
+        # Adicionar alguns membros aleatórios
+        members = [m for m in ctx.guild.members if not m.bot][:8]
+        for member in members:
+            if member not in [u["user"] for u in usuarios_exemplo]:
+                usuarios_exemplo.append({
+                    "user": member,
+                    "count": random.randint(1, 150)
+                })
+        
+        usuarios_exemplo.sort(key=lambda x: x["count"], reverse=True)
+        
+        embed = discord.Embed(
+            title=f"🏆 Ranking - {tipo.title()}",
+            color=discord.Color.gold()
+        )
+        
+        for i, user_data in enumerate(usuarios_exemplo[:10], 1):
+            emoji = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}."
+            embed.add_field(
+                name=f"{emoji} {user_data['user'].display_name}",
+                value=f"{user_data['count']} {tipo}",
+                inline=False
+            )
+        
+        await ctx.send(embed=embed)
+
+    @commands.command(name='clima')
+    async def clima_humor(self, ctx):
+        """Verifica o clima/humor do servidor"""
+        humores = [
+            ("😄", "Muito Alegre", "O servidor está radiante hoje!"),
+            ("😊", "Feliz", "Clima positivo por aqui!"),
+            ("😐", "Neutro", "Tudo tranquilo no servidor."),
+            ("😴", "Sonolento", "Parece que todos estão com sono..."),
+            ("🤔", "Pensativo", "Pessoal está refletindo hoje."),
+            ("🎉", "Festivo", "Hora de comemorar!")
+        ]
+        
+        emoji, humor, descricao = random.choice(humores)
+        
+        embed = discord.Embed(
+            title="🌡️ Clima do Servidor",
+            description=f"{emoji} **{humor}**\n{descricao}",
+            color=discord.Color.blue()
+        )
+        embed.add_field(
+            name="Membros Online:",
+            value=len([m for m in ctx.guild.members if m.status != discord.Status.offline]),
+            inline=True
+        )
+        embed.add_field(
+            name="Total de Membros:",
+            value=ctx.guild.member_count,
+            inline=True
+        )
+        
+        await ctx.send(embed=embed)
+
+    @commands.command(name='pergunta')
+    async def pergunta_aleatoria(self, ctx):
+        """Faz uma pergunta aleatória para animar a conversa"""
+        perguntas = [
+            "Se você pudesse ter qualquer superpoder, qual seria?",
+            "Qual é sua comida favorita?",
+            "Se você pudesse viajar para qualquer lugar, onde iria?",
+            "Qual é seu filme favorito?",
+            "Se você pudesse encontrar qualquer pessoa, quem seria?",
+            "Qual é sua cor favorita e por quê?",
+            "Se você pudesse aprender qualquer habilidade, qual seria?",
+            "Qual é seu animal favorito?",
+            "Se você pudesse mudar uma coisa no mundo, o que seria?",
+            "Qual é sua música favorita no momento?"
+        ]
+        
+        pergunta = random.choice(perguntas)
+        
+        embed = discord.Embed(
+            title="❓ Pergunta Aleatória",
+            description=pergunta,
+            color=discord.Color.purple()
+        )
+        embed.set_footer(text="Responda e mantenha a conversa viva!")
+        
+        await ctx.send(embed=embed)
+
+    @commands.command(name='gif')
+    async def gif_search(self, ctx, *, termo: str):
+        """Busca um GIF baseado no termo fornecido (simulado)"""
+        # Em produção, você usaria uma API como Giphy
+        categorias_gif = {
+            "gato": "https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif",
+            "cachorro": "https://media.giphy.com/media/mCRJDo24UvJMA/giphy.gif",
+            "feliz": "https://media.giphy.com/media/BlVnrxJgTGsUw/giphy.gif",
+            "triste": "https://media.giphy.com/media/BEob5qwFkSJ7G/giphy.gif",
+            "dança": "https://media.giphy.com/media/l3q2XhfQ8oCkm1Ts4/giphy.gif"
+        }
+        
+        termo_lower = termo.lower()
+        gif_url = None
+        
+        # Procurar termo nas categorias
+        for categoria, url in categorias_gif.items():
+            if categoria in termo_lower:
+                gif_url = url
+                break
+        
+        if not gif_url:
+            embed = discord.Embed(
+                title="❌ GIF Não Encontrado",
+                description=f"Não encontrei um GIF para '{termo}'. Tente: gato, cachorro, feliz, triste, dança",
+                color=discord.Color.red()
+            )
+        else:
+            embed = discord.Embed(
+                title=f"🎬 GIF: {termo}",
+                color=discord.Color.green()
+            )
+            embed.set_image(url=gif_url)
+            embed.set_footer(text=f"Solicitado por {ctx.author.display_name}")
+        
+        await ctx.send(embed=embed)
+
+    @commands.command(name='helpfun')
+    async def help_fun(self, ctx):
+        """Mostra todos os comandos de diversão disponíveis"""
+        embed = discord.Embed(
+            title="🎮 Sistema de Diversão - Comandos",
+            description="Lista completa de comandos para se divertir!",
+            color=discord.Color.rainbow()
+        )
         
         embed.add_field(
-            name="🎉 Eventos",
-            value="`!evento` - Ver comandos do evento\n`!evento entrar/sair/stats/rank/inventario`",
+            name="😂 Humor & Entretenimento",
+            value="`!piada` - Conta uma piada\n`!curiosidade` - Compartilha curiosidade\n`!pergunta` - Pergunta aleatória",
             inline=False
         )
         
         embed.add_field(
-            name="🎲 Jogos",
-            value="`!ship @user1 @user2` - Shipp entre usuários\n`!rolar [dados] [lados]` - Rolar dados\n`!girarmoeda` - Cara ou coroa\n`!jankenpon pedra/papel/tesoura`\n`!jogosvorazes @users` - Hunger Games\n`!vieirinha pergunta` - Magic 8-ball",
+            name="🎲 Jogos & Sorteios",
+            value="`!dado [lados]` - Rola um dado\n`!moeda` - Cara ou coroa\n`!rps <opção>` - Pedra, papel, tesoura\n`!escolher <opções>` - Escolhe entre opções",
             inline=False
         )
         
         embed.add_field(
-            name="🎨 Texto",
-            value="`!vaporwave texto` - Estilo vaporwave\n`!maiusculo/minusculo texto`\n`!zombar texto` - Texto alternado\n`!palmas texto` - Separar com palmas",
+            name="🔮 Diversão Social",
+            value="`!8ball <pergunta>` - Bola 8 mágica\n`!love @user1 @user2` - Calculadora do amor\n`!motivar [@usuário]` - Frase motivacional",
             inline=False
         )
         
         embed.add_field(
-            name="⭐ Avaliação",
-            value="`!avaliar_waifu nome` - Avaliar waifu\n`!avaliar_husbando nome` - Avaliar husbando",
+            name="👤 Perfil & Avatar",
+            value="`!avatar [@usuário]` - Mostra avatar\n`!rank [tipo]` - Ranking do servidor",
             inline=False
         )
         
         embed.add_field(
-            name="🎭 Diversão",
-            value="`!invocar_tiodopave` - Piadas ruins\n`!invocar_faustao` - Frases do Faustão\n`!invocar_kenji` - Kenji do Loop Infinito\n`!cancelar [@user]` - Cancelar alguém\n`!todogrupotem` - Tipos de pessoas\n`!tristerealidade` - Reflexões profundas",
+            name="🌡️ Servidor",
+            value="`!clima` - Clima do servidor\n`!gif <termo>` - Busca GIF",
             inline=False
         )
         
-        embed.add_field(
-            name="🔧 Utilitários",
-            value="`!testediversao` - Testar se o cog funciona\n`!helpdiversao` - Esta mensagem de ajuda",
-            inline=False
-        )
+        embed.set_footer(text="Use os comandos para animar seu servidor! 🎉")
         
-        embed.set_footer(text="Use os comandos com o prefixo do bot!")
         await ctx.send(embed=embed)
 
     async def cog_unload(self):
         """Fecha a conexão com MongoDB quando o cog é descarregado"""
         if self.client:
             self.client.close()
-            self.logger.info("🔌 Conexão com MongoDB (Diversão) fechada")
+            print("🔌 Conexão Fun System com MongoDB fechada")
 
 async def setup(bot):
-    """Função para carregar o cog"""
-    await bot.add_cog(Diversao(bot))
+    await bot.add_cog(FunSystem(bot))
