@@ -108,6 +108,13 @@ class Ajuda(commands.Cog):
             "`!dar / !give`"
         ), inline=False)
 
+        embed.add_field(name="📺 YouTube", value=(
+            "`!adicionaryt <URL> #canal` - Adiciona canal do YouTube\n"
+            "`!removeryt <URL>` - Remove canal do monitoramento\n"
+            "`!mensagemyt <mensagem>` - Define mensagem da notificação\n"
+            "`!listaryt` - Lista canais e mensagem atual"
+        ), inline=False)
+
         embed.add_field(name="🔧 Utilidades", value=(
             "`!botinfo`\n"
             "`!userinfo`\n"
@@ -139,19 +146,19 @@ class Ajuda(commands.Cog):
         ), inline=False)
 
         embed.add_field(name="🎮 Diversão", value=(
-            "`!piada` - Conta piadas aleatórias\n"
-            "`!curiosidade` - Compartilha fatos interessantes\n"
-            "`!pergunta` - Faz perguntas para animar conversas\n"
-            "`!dado [lados]` - Rola dados personalizáveis\n"
-            "`!moeda` - Cara ou coroa\n"
-            "`!rps <pedra/papel/tesoura>` - Jogo clássico\n"
-            "`!escolher <opções>` - Escolhe entre opções separadas por vírgula\n"
-            "`!8ball <pergunta>` - Bola 8 mágica\n"
-            "`!love @user1 @user2` - Calculadora de compatibilidade\n"
-            "`!motivar [@usuário]` - Frases motivacionais\n"
+            "`!piada`\n"
+            "`!curiosidade`\n"
+            "`!pergunta`\n"
+            "`!dado [lados]`\n"
+            "`!moeda`\n"
+            "`!rps <pedra/papel/tesoura>`\n"
+            "`!escolher <opções>`\n"
+            "`!8ball <pergunta>`\n"
+            "`!love @user1 @user2`\n"
+            "`!motivar [@usuário]`\n"
             "`!rank [mensagens/comandos]`\n"
-            "`!clima` - Verifica o 'humor' do servidor\n"
-            "`!gif <termo>` - Busca GIFs (com URLs de exemplo)"
+            "`!clima`\n"
+            "`!gif <termo>`"
         ), inline=False)
 
         embed.set_footer(text="Use os comandos com ! no início. Ex: !ping")
