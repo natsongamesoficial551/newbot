@@ -12,6 +12,7 @@ load_dotenv()
 TOKEN = os.getenv("TOKEN")
 AUTOPING = os.getenv("AUTOPING")
 MONGO_URL = os.getenv("MONGO_URL")  # URL de conexão MongoDB Atlas
+YT_API_KEY = os.getenv("YT_API_KEY")  # Chave da API do YouTube
 
 # Intents e prefixo
 intents = discord.Intents.all()
