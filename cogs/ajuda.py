@@ -30,7 +30,7 @@ class Ajuda(commands.Cog):
             },
             "antipalavrao": {
                 "emoji": "🛡️",
-                "nome": "Antipalavrão",
+                "nome": "Anti-palavrão",
                 "comandos": {
                     "🚫 **Filtro de Palavrões:**": [
                         "`!adicionarpalavrao <palavra>` - Adiciona palavra à lista",
@@ -101,14 +101,14 @@ class Ajuda(commands.Cog):
             },
             "boasvindas": {
                 "emoji": "👋",
-                "nome": "Boas-Vindas",
+                "nome": "Boas-vindas",
                 "comandos": {
                     "🚪 **Configurar Mensagens:**": [
                         "`!canalconfig #canal` - Canal de configuração",
                         "`!canalentrada #canal` - Canal de entrada",
                         "`!canalsaida #canal` - Canal de saída",
-                        "`!msgentrada mensagem` - Mensagem de entrada",
-                        "`!msgsaida mensagem` - Mensagem de saída"
+                        "`!msgentrada <mensagem>` - Mensagem de entrada",
+                        "`!msgsaida <mensagem>` - Mensagem de saída"
                     ],
                     "🧪 **Testes:**": [
                         "`!configmsg` - Ver configurações",
@@ -125,24 +125,24 @@ class Ajuda(commands.Cog):
                         "`!saldo`, `!bal` - Ver saldo",
                         "`!diario`, `!daily` - Bônus diário",
                         "`!inventario`, `!inv` - Ver inventário",
-                        "`!depositar`, `!dep` - Depositar no banco",
-                        "`!sacar`, `!withdraw` - Sacar do banco"
+                        "`!depositar <valor>`, `!dep <valor>` - Depositar no banco",
+                        "`!sacar <valor>`, `!withdraw <valor>` - Sacar do banco"
                     ],
                     "💼 **Trabalho:**": [
                         "`!trabalhar`, `!work` - Trabalhar",
                         "`!empregos`, `!jobs` - Ver empregos",
-                        "`!contratar`, `!hire` - Contratar funcionário",
-                        "`!demitir`, `!fire` - Demitir funcionário"
+                        "`!contratar @user`, `!hire @user` - Contratar funcionário",
+                        "`!demitir @user`, `!fire @user` - Demitir funcionário"
                     ],
                     "🛒 **Loja:**": [
                         "`!loja`, `!shop` - Ver loja",
-                        "`!comprar`, `!buy` - Comprar item",
-                        "`!vender`, `!sell` - Vender item"
+                        "`!comprar <item>`, `!buy <item>` - Comprar item",
+                        "`!vender <item>`, `!sell <item>` - Vender item"
                     ],
                     "🎰 **Riscos:**": [
                         "`!crime` - Cometer crime",
-                        "`!roubar`, `!rob` - Roubar usuário",
-                        "`!apostar`, `!bet` - Apostar dinheiro"
+                        "`!roubar @user`, `!rob @user` - Roubar usuário",
+                        "`!apostar <valor>`, `!bet <valor>` - Apostar dinheiro"
                     ]
                 }
             },
@@ -172,17 +172,113 @@ class Ajuda(commands.Cog):
                 "comandos": {
                     "ℹ️ **Informações:**": [
                         "`!botinfo` - Info do bot",
-                        "`!userinfo` - Info do usuário",
+                        "`!userinfo [@user]` - Info do usuário",
                         "`!serverinfo` - Info do servidor",
                         "`!ping` - Latência do bot",
                         "`!uptime` - Tempo online"
                     ],
                     "🖼️ **Perfil:**": [
-                        "`!avatar` - Avatar do usuário",
-                        "`!banner` - Banner do usuário",
+                        "`!avatar [@user]` - Avatar do usuário",
+                        "`!banner [@user]` - Banner do usuário",
                         "`!membercount` - Contador de membros"
                     ]
                 }
+            },
+            "configuracoes": {
+                "emoji": "⚙️",
+                "nome": "Configurações",
+                "comandos": {
+                    "🔧 **Configurações Básicas:**": [
+                        "`!setprefixo <prefixo>` - Define o prefixo do servidor",
+                        "`!setidioma <idioma>` - Define idioma (pt-BR, en-US, es-ES, fr-FR)",
+                        "`!verconfig` - Mostra as configurações atuais",
+                        "`!resetconfig` - Reseta todas as configurações"
+                    ]
+                }
+            },
+            "lembretes": {
+                "emoji": "⏰",
+                "nome": "Lembretes",
+                "comandos": {
+                    "📝 **Gerenciar Lembretes:**": [
+                        "`!lembrete <minutos> <mensagem>` - Define lembrete pessoal",
+                        "`!meuslembretes` - Mostra info sobre lembretes"
+                    ]
+                }
+            },
+            "eventos": {
+                "emoji": "📅",
+                "nome": "Eventos",
+                "comandos": {
+                    "⚙️ **Configuração:**": [
+                        "`!configcanal #eventos` - Define canal de eventos",
+                        "`!configaviso #avisos` - Define canal de avisos"
+                    ],
+                    "📋 **Gerenciamento:**": [
+                        "`!criarevento <DD/MM/AAAA> <HH:MM> <nome>` - Cria evento",
+                        "`!eventos` - Lista todos os eventos",
+                        "`!detalhesevento <ID>` - Mostra detalhes do evento",
+                        "`!removerevento <ID>` - Remove evento"
+                    ]
+                }
+            },
+            "sugestoes": {
+                "emoji": "💡",
+                "nome": "Sugestões",
+                "comandos": {
+                    "🔧 **Configuração (Admin):**": [
+                        "`!config_sugestoes [#canal]` - Define canal de sugestões"
+                    ],
+                    "📝 **Para Usuários:**": [
+                        "`!sugerir <texto>` - Envia nova sugestão (máx. 1000 chars)",
+                        "`!ver_sugestoes [@usuário]` - Ver últimas 10 sugestões"
+                    ],
+                    "👨‍💼 **Moderação:**": [
+                        "`!aprovar <id_mensagem>` - Aprova sugestão",
+                        "`!rejeitar <id_mensagem> [motivo]` - Rejeita sugestão",
+                        "`!stats_sugestoes` - Estatísticas do servidor",
+                        "`!limpar_sugestoes` - Remove TODAS as sugestões"
+                    ]
+                }
+            },
+            "backup": {
+                "emoji": "💾",
+                "nome": "Backup",
+                "comandos": {
+                    "📋 **Gerenciar Backup:**": [
+                        "`!backup [tipo]`, `!bkp [tipo]` - Cria backup",
+                        "`!restaurar [modo]`, `!restore [modo]` - Restaura backup",
+                        "`!verbackup [modo]`, `!vbkp [modo]` - Mostra backup salvo"
+                    ],
+                    "🗂️ **Administração:**": [
+                        "`!listarbackups`, `!listbkp` - Lista todos os backups",
+                        "`!deletarbackup`, `!delbkp` - Deleta backup do servidor"
+                    ]
+                }
+            }
+        }
+        
+        # Categorias especiais (não incluídas no dicionário principal)
+        self.categorias_especiais = {
+            "roleplay": {
+                "emoji": "🎭", 
+                "nome": "Roleplay",
+                "aliases": ["rp"]
+            },
+            "logs": {
+                "emoji": "📜", 
+                "nome": "Sistema de Logs",
+                "aliases": ["log"]
+            },
+            "tickets": {
+                "emoji": "🎫", 
+                "nome": "Sistema de Tickets",
+                "aliases": ["ticket"]
+            },
+            "status": {
+                "emoji": "📡", 
+                "nome": "Status do Bot",
+                "aliases": []
             }
         }
 
@@ -196,66 +292,113 @@ class Ajuda(commands.Cog):
             color=discord.Color.gold()
         )
         
-        categorias_texto = ""
-        for key, categoria in self.categorias.items():
-            categorias_texto += f"{categoria['emoji']} **{categoria['nome']}** - `{key}`\n"
+        # Categorias principais - Página 1
+        categorias_p1 = ""
+        count = 0
+        for key, categoria in list(self.categorias.items())[:8]:
+            categorias_p1 += f"{categoria['emoji']} **{categoria['nome']}** - `{key}`\n"
+            count += 1
         
         embed.add_field(
-            name="📋 Categorias Disponíveis:",
-            value=categorias_texto,
+            name="📋 Categorias Principais (1/2):",
+            value=categorias_p1,
             inline=False
         )
         
+        # Categorias principais - Página 2
+        categorias_p2 = ""
+        for key, categoria in list(self.categorias.items())[8:]:
+            categorias_p2 += f"{categoria['emoji']} **{categoria['nome']}** - `{key}`\n"
+        
+        if categorias_p2:
+            embed.add_field(
+                name="📋 Categorias Principais (2/2):",
+                value=categorias_p2,
+                inline=False
+            )
+        
+        # Categorias especiais
+        especiais_texto = ""
+        for key, categoria in self.categorias_especiais.items():
+            especiais_texto += f"{categoria['emoji']} **{categoria['nome']}** - `{key}`\n"
+        
         embed.add_field(
-            name="💡 Outros Comandos:",
-            value="🎭 `roleplay` - Comandos de roleplay\n"
-                  "📜 `logs` - Sistema de logs\n"
-                  "🎫 `tickets` - Sistema de tickets\n"
-                  "📡 `status` - Configurar status do bot",
+            name="💫 Categorias Especiais:",
+            value=especiais_texto,
             inline=False
         )
         
         embed.set_footer(text="💡 Use !ajuda <categoria> para ver comandos específicos")
+        embed.set_thumbnail(url=self.bot.user.avatar.url if self.bot.user.avatar else None)
+        
         await ctx.send(embed=embed)
 
-    @commands.command(name="ajuda", aliases=["help"])
+    @commands.command(name="ajuda", aliases=["h"])  # Removido o alias "help"
     async def ajuda_categoria(self, ctx, categoria: str = None):
-        """Mostra comandos de uma categoria específica ou todas"""
+        """Mostra comandos de uma categoria específica ou menu principal"""
         
         if not categoria:
-            # Se não especificar categoria, mostra o menu principal
             await self.listar_categorias(ctx)
             return
         
         categoria = categoria.lower()
         
-        # Categorias especiais que não estão no dicionário principal
-        if categoria in ["roleplay", "rp"]:
-            await self.ajuda_roleplay(ctx)
-            return
-        elif categoria in ["logs", "log"]:
-            await self.ajuda_logs(ctx)
-            return
-        elif categoria in ["tickets", "ticket"]:
-            await self.ajuda_tickets(ctx)
-            return
-        elif categoria in ["status"]:
-            await self.ajuda_status(ctx)
+        # Verifica aliases para categorias especiais
+        categoria_especial = None
+        for key, info in self.categorias_especiais.items():
+            if categoria == key or categoria in info.get("aliases", []):
+                categoria_especial = key
+                break
+        
+        # Categorias especiais
+        if categoria_especial:
+            if categoria_especial == "roleplay":
+                await self.ajuda_roleplay(ctx)
+            elif categoria_especial == "logs":
+                await self.ajuda_logs(ctx)
+            elif categoria_especial == "tickets":
+                await self.ajuda_tickets(ctx)
+            elif categoria_especial == "status":
+                await self.ajuda_status(ctx)
             return
         
-        # Verifica se a categoria existe
+        # Verifica se a categoria existe nas principais
         if categoria not in self.categorias:
+            # Tenta encontrar uma categoria similar
+            sugestoes = []
+            for key in self.categorias.keys():
+                if categoria in key or key.startswith(categoria):
+                    sugestoes.append(key)
+            
             embed = discord.Embed(
                 title="❌ Categoria não encontrada",
-                description=f"A categoria `{categoria}` não existe.\n"
-                           f"Use `!cmds` para ver todas as categorias disponíveis.",
+                description=f"A categoria `{categoria}` não existe.",
                 color=discord.Color.red()
             )
+            
+            if sugestoes:
+                embed.add_field(
+                    name="💡 Você quis dizer:",
+                    value="\n".join([f"`{s}`" for s in sugestoes[:3]]),
+                    inline=False
+                )
+            
+            embed.add_field(
+                name="📝 Ajuda:",
+                value="Use `!cmds` para ver todas as categorias disponíveis.",
+                inline=False
+            )
+            
             await ctx.send(embed=embed)
             return
         
         # Mostra comandos da categoria
+        await self.mostrar_categoria(ctx, categoria)
+
+    async def mostrar_categoria(self, ctx, categoria):
+        """Mostra os comandos de uma categoria específica"""
         cat_info = self.categorias[categoria]
+        
         embed = discord.Embed(
             title=f"{cat_info['emoji']} {cat_info['nome']}",
             description=f"Comandos da categoria **{cat_info['nome']}**",
@@ -270,7 +413,9 @@ class Ajuda(commands.Cog):
                 inline=False
             )
         
-        embed.set_footer(text="Use !cmds para ver todas as categorias")
+        embed.set_footer(text=f"Use !cmds para ver todas as categorias | Página: {categoria}")
+        embed.set_thumbnail(url=self.bot.user.avatar.url if self.bot.user.avatar else None)
+        
         await ctx.send(embed=embed)
 
     async def ajuda_roleplay(self, ctx):
@@ -304,21 +449,38 @@ class Ajuda(commands.Cog):
             inline=False
         )
         
+        embed.set_footer(text="Use !cmds para ver todas as categorias")
+        embed.set_thumbnail(url=self.bot.user.avatar.url if self.bot.user.avatar else None)
+        
         await ctx.send(embed=embed)
 
     async def ajuda_logs(self, ctx):
         """Sistema de logs"""
         embed = discord.Embed(
             title="📜 Sistema de Logs",
-            description="Configure logs para monitorar atividades",
+            description="Configure logs para monitorar atividades do servidor",
             color=discord.Color.orange()
         )
         
         embed.add_field(
             name="📝 **Configuração:**",
-            value="`!canaldelogs #canal` - Define canal de logs",
+            value="`!canaldelogs #canal` - Define canal de logs\n"
+                  "`!configlogs` - Ver configurações de logs\n"
+                  "`!togglelogs` - Liga/desliga sistema de logs",
             inline=False
         )
+        
+        embed.add_field(
+            name="📊 **Tipos de Logs:**",
+            value="• Mensagens editadas/deletadas\n"
+                  "• Membros entrando/saindo\n"
+                  "• Mudanças de cargo\n"
+                  "• Ações de moderação",
+            inline=False
+        )
+        
+        embed.set_footer(text="Use !cmds para ver todas as categorias")
+        embed.set_thumbnail(url=self.bot.user.avatar.url if self.bot.user.avatar else None)
         
         await ctx.send(embed=embed)
 
@@ -326,7 +488,7 @@ class Ajuda(commands.Cog):
         """Sistema de tickets"""
         embed = discord.Embed(
             title="🎫 Sistema de Tickets",
-            description="Sistema de suporte com tickets",
+            description="Sistema de suporte com tickets privados",
             color=discord.Color.green()
         )
         
@@ -334,11 +496,21 @@ class Ajuda(commands.Cog):
             name="🎫 **Gerenciar Tickets:**",
             value="`!ticket` - Criar novo ticket\n"
                   "`!fecharticket` - Fechar ticket atual\n"
-                  "`!adicionarcategoriaticket ID` - Adicionar categoria\n"
-                  "`!canaldecomandoticket #canal` - Canal de comandos\n"
-                  "`!configticket` - Ver configurações",
+                  "`!configticket` - Ver configurações\n"
+                  "`!canaldecomandoticket #canal` - Canal de comandos",
             inline=False
         )
+        
+        embed.add_field(
+            name="⚙️ **Configuração:**",
+            value="`!adicionarcategoriaticket <ID>` - Adicionar categoria\n"
+                  "`!removercategoriaticket <ID>` - Remover categoria\n"
+                  "`!listatickets` - Listar tickets ativos",
+            inline=False
+        )
+        
+        embed.set_footer(text="Use !cmds para ver todas as categorias")
+        embed.set_thumbnail(url=self.bot.user.avatar.url if self.bot.user.avatar else None)
         
         await ctx.send(embed=embed)
 
@@ -352,14 +524,86 @@ class Ajuda(commands.Cog):
         
         embed.add_field(
             name="🤖 **Configurar Status:**",
-            value="`!statusmodo` - Alterar modo do status\n"
+            value="`!statusmodo <online/idle/dnd/invisible>` - Alterar status\n"
                   "`!listarstatus` - Listar status disponíveis\n"
                   "`!statusintervalo <minutos>` - Intervalo de mudança\n"
-                  "`!statusmanual` - Definir status manual",
+                  "`!statusmanual <texto>` - Definir status manual",
             inline=False
         )
         
+        embed.add_field(
+            name="🎮 **Atividades:**",
+            value="`!atividade <tipo> <texto>` - Definir atividade\n"
+                  "**Tipos:** `playing`, `watching`, `listening`, `streaming`\n"
+                  "`!limparatividade` - Remover atividade atual",
+            inline=False
+        )
+        
+        embed.set_footer(text="Use !cmds para ver todas as categorias")
+        embed.set_thumbnail(url=self.bot.user.avatar.url if self.bot.user.avatar else None)
+        
         await ctx.send(embed=embed)
+
+    @commands.command(name="buscarcomando", aliases=["search", "procurar"])
+    async def buscar_comando(self, ctx, *, termo: str):
+        """Busca por comandos que contenham o termo especificado"""
+        termo = termo.lower()
+        resultados = []
+        
+        # Busca nas categorias principais
+        for categoria_key, categoria in self.categorias.items():
+            for secao, comandos in categoria['comandos'].items():
+                for comando in comandos:
+                    if termo in comando.lower():
+                        resultados.append({
+                            'categoria': categoria['nome'],
+                            'comando': comando,
+                            'emoji': categoria['emoji']
+                        })
+        
+        if not resultados:
+            embed = discord.Embed(
+                title="🔍 Busca sem Resultados",
+                description=f"Nenhum comando encontrado para: `{termo}`",
+                color=discord.Color.red()
+            )
+            embed.add_field(
+                name="💡 Dica:",
+                value="Tente usar termos mais específicos ou use `!cmds` para ver todas as categorias.",
+                inline=False
+            )
+        else:
+            embed = discord.Embed(
+                title=f"🔍 Resultados para: `{termo}`",
+                description=f"Encontrados {len(resultados)} comando(s)",
+                color=discord.Color.green()
+            )
+            
+            # Limita a 10 resultados para não sobrecarregar
+            for resultado in resultados[:10]:
+                embed.add_field(
+                    name=f"{resultado['emoji']} {resultado['categoria']}",
+                    value=resultado['comando'],
+                    inline=False
+                )
+            
+            if len(resultados) > 10:
+                embed.set_footer(text=f"Mostrando 10 de {len(resultados)} resultados")
+        
+        await ctx.send(embed=embed)
+
+    @ajuda_categoria.error
+    async def ajuda_error(self, ctx, error):
+        """Tratamento de erros para o comando ajuda"""
+        if isinstance(error, commands.MissingRequiredArgument):
+            await self.listar_categorias(ctx)
+        else:
+            embed = discord.Embed(
+                title="❌ Erro",
+                description="Ocorreu um erro ao processar o comando de ajuda.",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(Ajuda(bot))
