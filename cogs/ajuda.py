@@ -184,15 +184,16 @@ class Ajuda(commands.Cog):
                     ]
                 }
             },
-            "configuracoes": {
-                "emoji": "⚙️",
-                "nome": "Configurações",
+            "mensagensautomaticas": {
+                "emoji": "🤖",
+                "nome": "Mensagens Automáticas",
                 "comandos": {
-                    "🔧 **Configurações Básicas:**": [
-                        "`!setprefixo <prefixo>` - Define o prefixo do servidor",
-                        "`!setidioma <idioma>` - Define idioma (pt-BR, en-US, es-ES, fr-FR)",
-                        "`!verconfig` - Mostra as configurações atuais",
-                        "`!resetconfig` - Reseta todas as configurações"
+                    "📨 **Gerenciar Mensagens:**": [
+                        "`!adicionarmensagem <horas> <mensagem>`, `!addmsg <horas> <mensagem>` - Adiciona mensagem automática",
+                        "`!removermensagem <parte da mensagem>`, `!rmmsg <parte da mensagem>` - Remove mensagem automática",
+                        "`!mensagens`, `!listmsg` - Lista todas as mensagens automáticas ativas",
+                        "`!testmensagem <parte da mensagem>`, `!testmsg <parte da mensagem>` - Testa uma mensagem automática",
+                        "`!statusmsg` - Verifica status da conexão com banco de dados"
                     ]
                 }
             },
